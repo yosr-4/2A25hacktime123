@@ -1,0 +1,11 @@
+<RCC>
+    <qresource prefix="/new/prefix1">
+        <file>IMAGES/WhatsApp_Image_2026-10-04_at_7.05.41_PM-removebg-preview.png</file>
+        <file>IMAGES/WhatsApp_Image_2026-10-04_at_7.05.42_PM__1_-removebg-preview.png</file>
+        <file>IMAGES/WhatsApp_Image_2026-10-04_at_7.05.42_PM__2_-removebg-preview.png</file>
+        <file>IMAGES/WhatsApp_Image_2026-10-04_at_7.05.42_PM-removebg-preview.png</file>
+        <file>IMAGES/WhatsApp_Image_2026-10-04_at_7.05.43_PM__1_-removebg-preview.png</file>
+        <file>IMAGES/WhatsApp_Image_2026-10-04_at_7.05.43_PM-removebg-preview.png</file>
+        <file>logo.png</file>
+    </qresource>
+</RCC>
