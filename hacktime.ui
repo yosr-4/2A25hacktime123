@@ -7859,7 +7859,7 @@ QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
                           <bool>true</bool>
                          </property>
                          <property name="text">
-                          <string>La charge d'un employé est le nombre de compétitions planifiées ou en cours qu'il gère (colonne ID_EMPLOYE de COMPETITION). Une alerte est levée au-delà de 2 compétitions actives, si deux de ses compétitions ont lieu en même temps, ou si un membre du jury gère une compétition.</string>
+                          <string>La charge d'un employé est le nombre de compétitions planifiées ou en cours qu'il gère (table GERER). Une alerte est levée au-delà de 2 compétitions actives, si deux de ses compétitions ont lieu en même temps, ou si un membre du jury gère une compétition.</string>
                          </property>
                         </widget>
                        </item>

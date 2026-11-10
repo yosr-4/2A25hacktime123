@@ -1,4 +1,4 @@
-QT += core gui widgets sql
+QT += core gui widgets sql printsupport
 
 CONFIG += c++17
 
@@ -11,13 +11,17 @@ msvc: QMAKE_CXXFLAGS += /utf-8
 SOURCES += \
     competition.cpp \
     connection.cpp \
+    employe.cpp \
     hacktime.cpp \
-    main.cpp
+    main.cpp \
+    statsemploye.cpp
 
 HEADERS += \
     competition.h \
     connection.h \
-    hacktime.h
+    employe.h \
+    hacktime.h \
+    statsemploye.h
 
 FORMS += \
     hacktime.ui
