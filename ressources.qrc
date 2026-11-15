@@ -1,0 +1,28 @@
+<RCC>
+    <!-- Compétitions + page de connexion -->
+    <qresource prefix="/">
+        <file>images/Logo_HackTime.png</file>
+        <file>images/eye.png</file>
+        <file>images/eye_off.png</file>
+        <file>images/icon.png</file>
+        <file>images/login_bg.jpg</file>
+        <file>images/login_card.png</file>
+        <file>images/logo.png</file>
+        <file>images/logo_hacktime_clair.png</file>
+        <!-- Employés -->
+        <file>resources/fleche_bas.png</file>
+        <file>resources/fleche_haut.png</file>
+        <file>resources/logo_horloge.png</file>
+        <file>resources/logo_icone.png</file>
+    </qresource>
+    <!-- Équipes (chemins d'origine conservés : :/new/prefix1/...) -->
+    <qresource prefix="/new/prefix1">
+        <file alias="IMAGES/WhatsApp_Image_2026-10-04_at_7.05.41_PM-removebg-preview.png">equipes_images/WhatsApp_Image_2026-10-04_at_7.05.41_PM-removebg-preview.png</file>
+        <file alias="IMAGES/WhatsApp_Image_2026-10-04_at_7.05.42_PM-removebg-preview.png">equipes_images/WhatsApp_Image_2026-10-04_at_7.05.42_PM-removebg-preview.png</file>
+        <file alias="IMAGES/WhatsApp_Image_2026-10-04_at_7.05.42_PM__1_-removebg-preview.png">equipes_images/WhatsApp_Image_2026-10-04_at_7.05.42_PM__1_-removebg-preview.png</file>
+        <file alias="IMAGES/WhatsApp_Image_2026-10-04_at_7.05.42_PM__2_-removebg-preview.png">equipes_images/WhatsApp_Image_2026-10-04_at_7.05.42_PM__2_-removebg-preview.png</file>
+        <file alias="IMAGES/WhatsApp_Image_2026-10-04_at_7.05.43_PM-removebg-preview.png">equipes_images/WhatsApp_Image_2026-10-04_at_7.05.43_PM-removebg-preview.png</file>
+        <file alias="IMAGES/WhatsApp_Image_2026-10-04_at_7.05.43_PM__1_-removebg-preview.png">equipes_images/WhatsApp_Image_2026-10-04_at_7.05.43_PM__1_-removebg-preview.png</file>
+        <file alias="logo.png">equipes_images/logo.png</file>
+    </qresource>
+</RCC>
