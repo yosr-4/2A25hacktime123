@@ -47,6 +47,7 @@ public:
     void setStatut(const QString &v) { statut = v; }
     void setMode(const QString &v) { mode = v; }
     void setIdJury(int v) { idJury = v; }
+    void setNomJury(const QString &v) { nomJury = v; }
 
     // ----- contrôle de saisie : message d'erreur, ou chaîne vide si tout est valide
     QString verifier() const;
@@ -56,10 +57,14 @@ public:
     QSqlQueryModel *afficher();              // SELECT, pour un QTableView
     bool modifier();                         // UPDATE selon l'ID
     static bool supprimer(int id);           // DELETE
+    static bool changerStatut(int id, const QString &statut);   // UPDATE du statut (scénario Arduino)
     static bool nomExiste(const QString &nom, int idExclu = 0);   // nom déjà utilisé ?
     static QVector<Competition> lister();    // SELECT, pour remplir le tableau de l'interface
     static QList<QPair<int, QString>> listerJurys();   // employés JURY : {ID_EMPLOYE, « Prénom Nom »}
-    static QString derniereErreur();         // message Oracle de la dernière erreur
+    static QString derniereErreur();
+    // connexion : gestion autorisée pour LOGIN + MDP (table EMPLOYE), sinon vide
+    // TOUT, COMPETITIONS, EQUIPES, PARTICIPANTS, ATELIERS ou EMPLOYES
+    static QString accesConnexion(const QString &login, const QString &mdp);         // message Oracle de la dernière erreur
 
 private:
     int id = 0;

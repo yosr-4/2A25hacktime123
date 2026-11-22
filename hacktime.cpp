@@ -3,6 +3,7 @@
 #include "competition.h"
 #include "employe.h"
 #include "statsemploye.h"
+#include "arduino.h"
 
 #include <QAction>
 #include <QDate>
@@ -60,6 +61,12 @@
 #include <QTableWidgetItem>
 #include <QVariantAnimation>
 #include <cmath>
+#include <functional>
+#include <QLinearGradient>
+#include <QPointer>
+#include <QSerialPort>
+#include <QScrollArea>
+#include <QTime>
 
 // =====================================================================
 // === CONSTRUCTEUR & DESTRUCTEUR ======================================
@@ -115,6 +122,24 @@ HackTime::HackTime(QWidget *parent)
     initAtelier();
     initEmploye();
 
+    // déconnexion depuis la page Employés (menu du bouton utilisateur en haut à droite)
+    if (QMenu *menu = ui->boutonUtilisateur->menu()) {
+        menu->addSeparator();
+        connect(menu->addAction("🚪  Se déconnecter"), &QAction::triggered, this, &HackTime::deconnexionComp);
+    }
+    // bouton « Se déconnecter » en bas du menu de chaque gestion
+    for (QBoxLayout *menu : {static_cast<QBoxLayout *>(ui->sidebarLayoutComp), static_cast<QBoxLayout *>(ui->verticalLayout),
+                             static_cast<QBoxLayout *>(ui->sidebarLayoutPart), static_cast<QBoxLayout *>(ui->sidebarLayoutAtelier),
+                             static_cast<QBoxLayout *>(ui->dispositionSidebar)}) {
+        QPushButton *sortir = new QPushButton("🚪  Se déconnecter");
+        sortir->setCursor(Qt::PointingHandCursor);
+        sortir->setStyleSheet("QPushButton { color:#EF4444; font-weight:bold; text-align:left; padding:10px 14px;"
+                              " background:transparent; border:0; } QPushButton:hover { background:rgba(239,68,68,0.12);"
+                              " border-radius:8px; }");
+        connect(sortir, &QPushButton::clicked, this, &HackTime::deconnexionComp);
+        menu->addWidget(sortir);
+    }
+
     allerLogin();
 }
 
@@ -130,36 +155,82 @@ HackTime::~HackTime()
 
 void HackTime::allerLogin()
 {
+    limiterAcces("TOUT");               // à la déconnexion, plus aucune limite
     ui->stackedHackTime->setCurrentWidget(ui->pageLogin);
     setWindowTitle("HackTime - Connexion");
 }
 
+// Accès : chaque compte n'ouvre que SA gestion (colonne ACCES de la table EMPLOYE).
+// "TOUT" = administrateur. Les boutons des autres gestions sont grisés dans tous les menus.
+void HackTime::limiterAcces(const QString &module)
+{
+    accesModule = module.isEmpty() ? QString("TOUT") : module;
+    const QList<QPair<QPushButton *, QString>> boutons = {
+        // menu de la page Compétitions
+        {ui->btnCompetitionsComp, "COMPETITIONS"}, {ui->btnEquipesComp, "EQUIPES"},
+        {ui->btnParticipantsComp, "PARTICIPANTS"}, {ui->btnAtelierComp, "ATELIERS"},
+        {ui->btnEmployesComp, "EMPLOYES"},
+        // menu de la page Équipes
+        {ui->pushButton_2, "COMPETITIONS"}, {ui->pushButton_9, "EQUIPES"},
+        {ui->pushButton_8, "PARTICIPANTS"}, {ui->pushButton_7, "ATELIERS"}, {ui->pushButton_6, "EMPLOYES"},
+        // menu de la page Participants
+        {ui->btnCompetitionsPart, "COMPETITIONS"}, {ui->btnEquipesPart, "EQUIPES"},
+        {ui->btnParticipantsPart, "PARTICIPANTS"}, {ui->btnAtelierPart, "ATELIERS"},
+        {ui->btnEmployesPart, "EMPLOYES"},
+        // menu de la page Ateliers
+        {ui->btnCompetitionsAtelier, "COMPETITIONS"}, {ui->btnEquipesAtelier, "EQUIPES"},
+        {ui->btnParticipantsAtelier, "PARTICIPANTS"}, {ui->btnAtelierAtelier, "ATELIERS"},
+        {ui->btnEmployesAtelier, "EMPLOYES"},
+        // menu de la page Employés
+        {ui->boutonCompetitions, "COMPETITIONS"}, {ui->boutonEquipes, "EQUIPES"},
+        {ui->boutonParticipants, "PARTICIPANTS"}, {ui->boutonAtelier, "ATELIERS"},
+        {ui->boutonEmployes, "EMPLOYES"}};
+    for (const auto &b : boutons) {
+        const bool permis = accesModule == "TOUT" || accesModule == b.second;
+        b.first->setEnabled(permis);
+        b.first->setToolTip(permis ? QString() : QString("Accès refusé : ce compte n'a pas accès à cette gestion"));
+    }
+}
+
+// vrai si la gestion peut être ouverte ; sinon message d'accès refusé
+bool HackTime::accesAutorise(const QString &module)
+{
+    if (accesModule == "TOUT" || accesModule == module) return true;
+    QMessageBox::warning(this, "Accès refusé", "Ce compte n'a pas accès à cette gestion.");
+    return false;
+}
+
 void HackTime::allerCompetitions()
 {
+    if (!accesAutorise("COMPETITIONS")) return;
     ui->stackedHackTime->setCurrentWidget(ui->pageCompetitions);
     setWindowTitle("HackTime - Compétitions");
 }
 
 void HackTime::allerEquipes()
 {
+    if (!accesAutorise("EQUIPES")) return;
     ui->stackedHackTime->setCurrentWidget(ui->pageEquipes);
     setWindowTitle("HackTime - Équipes");
 }
 
 void HackTime::allerParticipants()
 {
+    if (!accesAutorise("PARTICIPANTS")) return;
     ui->stackedHackTime->setCurrentWidget(ui->pageParticipants);
     setWindowTitle("HackTime - Participants");
 }
 
 void HackTime::allerAteliers()
 {
+    if (!accesAutorise("ATELIERS")) return;
     ui->stackedHackTime->setCurrentWidget(ui->pageAteliers);
     setWindowTitle("HackTime - Ateliers");
 }
 
 void HackTime::allerEmployes()
 {
+    if (!accesAutorise("EMPLOYES")) return;
     ui->stackedHackTime->setCurrentWidget(ui->pageEmployes);
     setWindowTitle("HackTime - Employés");
 }
@@ -183,6 +254,7 @@ bool HackTime::eventFilter(QObject *obj, QEvent *ev)
 
 void HackTime::initCompetition()
 {
+    initArduinoComp();   // scénario Arduino : borne de suivi
     fondLogin = QPixmap(":/images/login_bg.jpg");
     preparerLoginComp();
     preparerFenetreComp();
@@ -197,9 +269,6 @@ void HackTime::on_BLoginCompet_clicked()
 
 // ----- données fixes et petites fonctions du module (espace de noms CompUI)
 namespace CompUI {
-// compte de l'application
-static const QString UTILISATEUR_COMP = "hacktime123";
-static const QString MOT_DE_PASSE_COMP = "hacktime123";
 
 static const int PAR_PAGE = 8;
 
@@ -327,18 +396,38 @@ void HackTime::afficherLoginComp()
     ui->EditLoginCompet->setFocus();
 }
 
-// Connexion : nom d'utilisateur = hacktime123, mot de passe = hacktime123
+// Connexion : le compte est vérifié dans la table EMPLOYE (LOGIN, MDP) ; le ROLE donne les accès
+//   colonne ACCES : TOUT (administrateur) ou une seule gestion (COMPETITIONS, EQUIPES, PARTICIPANTS, ATELIERS, EMPLOYES)
 void HackTime::seConnecterComp()
 {
     const QString utilisateur = ui->EditLoginCompet->text().trimmed();
     const QString mdp = ui->EditPWDCompet->text();
-    if (utilisateur != UTILISATEUR_COMP || mdp != MOT_DE_PASSE_COMP) {
-        ui->lblErrLoginCompet->setText(utilisateur.isEmpty() || mdp.isEmpty()
-                                           ? "Saisissez le nom d'utilisateur et le mot de passe."
-                                           : "Nom d'utilisateur ou mot de passe incorrect.");
+    if (utilisateur.isEmpty() || mdp.isEmpty()) {
+        ui->lblErrLoginCompet->setText("Saisissez le nom d'utilisateur et le mot de passe.");
+        ui->lblErrLoginCompet->show();
+        return;
+    }
+    // le compte est cherché dans la table EMPLOYE d'Oracle (LOGIN, MDP) ; ACCES donne la gestion permise
+    const QString acces = Competition::accesConnexion(utilisateur, mdp);
+    if (acces.isEmpty()) {          // compte inconnu (ou base non connectée)
+        ui->lblErrLoginCompet->setText("Nom d'utilisateur ou mot de passe incorrect.");
         ui->lblErrLoginCompet->show();
         ui->EditPWDCompet->clear();
         ui->EditPWDCompet->setFocus();
+        return;
+    }
+    limiterAcces(acces);
+    clignotementLoginComp->stop();
+    static_cast<QGraphicsOpacityEffect *>(clignotementLoginComp->targetObject())->setOpacity(1.0);
+
+    // compte d'une autre gestion : on ouvre directement sa page
+    if (acces != "TOUT" && acces != "COMPETITIONS") {
+        ui->lblErrLoginCompet->hide();
+        roleComp.clear();                    // aucun droit sur les compétitions
+        if (acces == "EQUIPES") allerEquipes();
+        else if (acces == "PARTICIPANTS") allerParticipants();
+        else if (acces == "ATELIERS") allerAteliers();
+        else allerEmployes();
         return;
     }
     ui->lblErrLoginCompet->hide();
@@ -346,13 +435,14 @@ void HackTime::seConnecterComp()
     clignotementLoginComp->stop();
     static_cast<QGraphicsOpacityEffect *>(clignotementLoginComp->targetObject())->setOpacity(1.0);
 
-    ui->adminComp->setText(QString("👤  <b>%1</b>  ▾").arg(roleComp));
+    ui->adminComp->setText(QString("👤  <b>%1</b>  ▾").arg(acces == "TOUT" ? roleComp : QString("Resp. compétitions")));
     ui->adminComp->setToolTip("Cliquer pour se déconnecter");
     ui->cardAddComp->setVisible(true);
     on_btnClearComp_clicked();
 
     allerCompetitions();
     afficherComp();
+    alerteArduinoComp();   // borne : alerte si une compétition commence aujourd'hui
 }
 
 void HackTime::deconnexionComp()
@@ -402,6 +492,11 @@ bool HackTime::filtreEvenementsComp(QObject *obj, QEvent *ev)
     // courbes des statistiques, dessinées dans le QLabel « statsChart »
     if (obj == ui->statsChartComp && ev->type() == QEvent::Paint) {
         dessinerCourbesComp(ui->statsChartComp);
+        return true;
+    }
+    // même graphique, en grand, dans la fenêtre des statistiques
+    if (zoneCourbesStatsComp && obj == zoneCourbesStatsComp && ev->type() == QEvent::Paint) {
+        dessinerCourbesComp(zoneCourbesStatsComp);
         return true;
     }
 
@@ -494,6 +589,23 @@ void HackTime::preparerFenetreComp()
 
     // MÉTIERS : calendrier, export PDF, export Excel
     connect(ui->btnCalendar, &QPushButton::clicked, this, &HackTime::ouvrirCalendrierComp);
+    // « Voir les statistiques » : ouvre l'onglet Statistiques
+    ui->btnReports->setText("📊  Voir les statistiques");
+    ui->btnExportPdfComp->setText("🖼️  Affiches PDF");
+    ui->btnExportPdfComp->setToolTip("Affiches PDF des compétitions affichées (une page par compétition)");
+    ui->ongletsComp->setCurrentWidget(ui->ongletListeComp);
+    ui->cardStatutComp->hide();   // les statistiques sont maintenant dans l'onglet « Statistiques »
+    ui->ongletsComp->setStyleSheet(
+        "QTabWidget::pane { border:none; border-top:1px solid #e1e7f2; }"
+        "QTabBar { qproperty-drawBase:0; }"
+        "QTabBar::tab { background:transparent; color:#65708b; padding:10px 16px; font-weight:bold;"
+        "  border:none; border-bottom:3px solid transparent; }"
+        "QTabBar::tab:hover { color:#0f1a38; }"
+        "QTabBar::tab:selected { color:#1a5ae8; border-bottom:3px solid #1a5ae8; }"
+        "QScrollArea, QWidget#contenuStatsComp { background:transparent; }"
+        "QFrame#carteStat { background:#FFFFFF; border:1px solid #DCE5F0; border-radius:12px; }"
+        "QProgressBar { background:#EDF2F9; border:0; border-radius:5px; }");
+    connect(ui->btnReports, &QPushButton::clicked, this, &HackTime::ouvrirStatistiquesComp);
     connect(ui->btnExportPdfComp, &QPushButton::clicked, this, &HackTime::exporterPdfComp);
     connect(ui->btnExportExcelComp, &QPushButton::clicked, this, &HackTime::exporterExcelComp);
 
@@ -726,6 +838,7 @@ Competition HackTime::lireFormulaireComp() const
                   ui->aMode->currentText());
     c.setId(idEnModificationComp);
     c.setIdJury(ui->aJury->currentData().toInt());   // colonne ID_JURY dans Oracle
+    if (c.getIdJury() > 0) c.setNomJury(ui->aJury->currentText());   // pour l'affiche
     return c;
 }
 
@@ -965,6 +1078,8 @@ void HackTime::mettreAJourStatistiquesComp()
     }
     ui->statsChartComp->setText(QString());
     ui->statsChartComp->update();
+    remplirOngletStatsComp();   // l'onglet « Statistiques » suit les données
+    envoyerArduinoComp(false);  // la borne Arduino suit aussi
 
     const int faites = parStatut.value("En cours") + parStatut.value("Terminée");
     ui->lblTaux->setText(QString("<b>Taux de participation : %1 %</b>  (compétitions en cours ou terminées)")
@@ -1088,64 +1203,41 @@ void HackTime::dessinerCourbesComp(QWidget *zone)
     }
 }
 
-// ----- MÉTIER : export PDF (liste des compétitions affichées)
+// ----- MÉTIER : export PDF = les AFFICHES des compétitions affichées (une page par compétition)
 void HackTime::exporterPdfComp()
 {
     if (filtreeComp.isEmpty()) {
-        QMessageBox::information(this, "Exporter PDF", "Aucune compétition à exporter.");
+        QMessageBox::information(this, "Affiches PDF", "Aucune compétition à afficher.");
         return;
     }
-    QString chemin = QFileDialog::getSaveFileName(
-        this, "Enregistrer le PDF",
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/Competitions_HackTime.pdf",
-        "Document PDF (*.pdf)");
+    const QString dossier = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/HackTime";
+    QDir().mkpath(dossier);
+    QString chemin = QFileDialog::getSaveFileName(this, "Enregistrer les affiches",
+                                                  dossier + "/Affiches_Competitions.pdf",
+                                                  "Document PDF (*.pdf)");
     if (chemin.isEmpty()) return;
     if (!chemin.endsWith(".pdf", Qt::CaseInsensitive)) chemin += ".pdf";
 
-    // le document est écrit en HTML, puis imprimé dans le PDF
-    QLocale fr(QLocale::French);
-    QString html =
-        "<table width='100%'><tr><td><img src='logo' width='170'></td>"
-        "<td align='right'><span style='font-size:18pt;font-weight:bold;color:#0E1A2B'>Liste des compétitions</span><br>"
-        "<span style='color:#64748B'>Édité le " + fr.toString(QDate::currentDate(), "d MMMM yyyy") +
-        " · " + QString::number(filtreeComp.size()) + " compétition(s)</span></td></tr></table><br>"
-        "<table width='100%' cellspacing='0' cellpadding='6' style='border-collapse:collapse'>"
-        "<tr style='background:#1665E8;color:white;font-weight:bold'>"
-        "<td>Nom</td><td>Thème</td><td>Début</td><td>Fin</td><td>Mode</td>"
-        "<td>Membres max</td><td>Statut</td><td>Salle</td><td>Jury</td><td>Sponsors</td></tr>";
-    int ligne = 0;
-    for (const Competition &c : filtreeComp) {
-        const QStringList x = infosComp.value(c.getId(), VIDE);
-        html += QString("<tr style='background:%1'>").arg(ligne++ % 2 ? "#F3F6FC" : "#FFFFFF");
-        const QStringList cellules = {c.getNom(), c.getTheme(),
-                                      c.getDateDebut().toString("dd/MM/yyyy"),
-                                      c.getDateFin().toString("dd/MM/yyyy"), c.getMode(),
-                                      QString::number(c.getNbMaxMembres()), c.getStatut(),
-                                      ouTiret(x.value(0)), ouTiret(c.getNomJury()), ouTiret(x.value(3))};
-        for (int i = 0; i < cellules.size(); ++i) {
-            if (i == 6)   // Statut
-                html += QString("<td><span style='color:%1;font-weight:bold'>%2</span></td>")
-                            .arg(statutFg(c.getStatut()), cellules.at(i).toHtmlEscaped());
-            else
-                html += "<td>" + cellules.at(i).toHtmlEscaped() + "</td>";
-        }
-        html += "</tr>";
-    }
-    html += "</table><br><p style='color:#94A3B8;font-size:8pt'>HackTime · Gestion des compétitions</p>";
-
     QPdfWriter pdf(chemin);
     pdf.setPageSize(QPageSize(QPageSize::A4));
-    pdf.setPageOrientation(QPageLayout::Landscape);
-    pdf.setPageMargins(QMarginsF(12, 12, 12, 12), QPageLayout::Millimeter);
-    pdf.setTitle("HackTime : liste des compétitions");
+    pdf.setPageOrientation(QPageLayout::Portrait);
+    pdf.setPageMargins(QMarginsF(0, 0, 0, 0), QPageLayout::Millimeter);
+    pdf.setResolution(300);
+    pdf.setTitle("HackTime : affiches des compétitions");
     pdf.setCreator("HackTime");
 
-    QTextDocument doc;
-    doc.addResource(QTextDocument::ImageResource, QUrl("logo"), QImage(":/images/logo_hacktime_clair.png"));
-    doc.setDefaultFont(QFont("Segoe UI", 9));
-    doc.setHtml(html);
-    doc.print(&pdf);
-    afficherFichierComp("Exporter PDF", chemin);
+    QPainter p;
+    if (!p.begin(&pdf)) {
+        QMessageBox::warning(this, "Affiches PDF",
+                             "Impossible de créer le fichier. Il est peut-être ouvert : fermez-le et réessayez.");
+        return;
+    }
+    for (int i = 0; i < filtreeComp.size(); ++i) {
+        if (i > 0) pdf.newPage();
+        dessinerAfficheComp(p, filtreeComp.at(i));
+    }
+    p.end();
+    afficherFichierComp("Affiches PDF", chemin);
 }
 
 // ----- MÉTIER : export Excel (.xlsx)
@@ -1334,97 +1426,229 @@ void HackTime::afficherFichierComp(const QString &titre, const QString &chemin)
     if (boite.clickedButton() == ouvrir) QDesktopServices::openUrl(QUrl::fromLocalFile(chemin));
 }
 
-// ----- MÉTIER : calendrier des compétitions
-//  Les jours occupés sont colorés selon le statut ; un clic sur un jour liste
-//  les compétitions de ce jour ; un double-clic sélectionne la compétition.
+// ----- MÉTIER : calendrier des compétitions (nouvelle interface)
+//  À gauche : le calendrier (jours colorés selon le statut, aujourd'hui en orange)
+//  À droite : TOUTES les compétitions en cartes ; celles du jour choisi sont mises en avant.
+//  Clic sur une carte : le calendrier va à sa date. Double-clic : carte « Détails ».
 void HackTime::ouvrirCalendrierComp()
 {
     QDialog dlg(this);
     dlg.setWindowTitle("Calendrier des compétitions");
-    dlg.resize(600, 680);
+    dlg.resize(1040, 660);
+    dlg.setStyleSheet(
+        "QDialog { background:#F4F7FC; }"
+        "QLabel { color:#0E1A2B; background:transparent; }"
+        "QFrame#carteCal { background:#FFFFFF; border:1px solid #DCE5F0; border-radius:12px; }"
+        "QPushButton#btnCal { background:#FFFFFF; color:#1665E8; border:1px solid #1665E8;"
+        "  border-radius:8px; padding:6px 14px; font-weight:600; }"
+        "QPushButton#btnCal:hover { background:#EAF1FF; }"
+        "QCalendarWidget QWidget#qt_calendar_navigationbar { background:#1665E8; border-top-left-radius:10px;"
+        "  border-top-right-radius:10px; min-height:44px; }"
+        "QCalendarWidget QToolButton { color:white; font-size:15px; font-weight:700; background:transparent;"
+        "  border:0; padding:4px 10px; }"
+        "QCalendarWidget QToolButton:hover { background:rgba(255,255,255,0.18); border-radius:6px; }"
+        "QCalendarWidget QToolButton::menu-indicator { image:none; }"
+        "QCalendarWidget QSpinBox { color:white; background:#1665E8; border:0; font-size:15px; font-weight:700; }"
+        "QCalendarWidget QAbstractItemView { background:#FFFFFF; color:#0E1A2B; font-size:13px;"
+        "  selection-background-color:#1665E8; selection-color:white; outline:0; }"
+        "QCalendarWidget QAbstractItemView:disabled { color:#C3CCD9; }"
+        "QListWidget { background:transparent; border:0; outline:0; }"
+        "QListWidget::item { border:0; padding:0; margin:0 0 8px 0; }"
+        "QListWidget::item:selected { background:transparent; }"
+        "QScrollBar:vertical { width:9px; background:transparent; }"
+        "QScrollBar::handle:vertical { background:#C3CCD9; border-radius:4px; min-height:30px; }");
 
-    QCalendarWidget *cal = new QCalendarWidget(&dlg);
-    cal->setGridVisible(true);
+    QLocale fr(QLocale::French);
+
+    // ---------------------------------------------------------------- partie gauche
+    QFrame *gauche = new QFrame(&dlg);
+    gauche->setObjectName("carteCal");
+    QVBoxLayout *lg = new QVBoxLayout(gauche);
+    lg->setContentsMargins(16, 16, 16, 16);
+    lg->setSpacing(12);
+
+    QLabel *titre = new QLabel("📅  Calendrier des compétitions", gauche);
+    titre->setStyleSheet("font-size:18px; font-weight:800;");
+    QPushButton *btnAujourdhui = new QPushButton("Aujourd'hui", gauche);
+    btnAujourdhui->setObjectName("btnCal");
+    btnAujourdhui->setCursor(Qt::PointingHandCursor);
+    QHBoxLayout *entete = new QHBoxLayout;
+    entete->addWidget(titre);
+    entete->addStretch();
+    entete->addWidget(btnAujourdhui);
+    lg->addLayout(entete);
+
+    QCalendarWidget *cal = new QCalendarWidget(gauche);
+    cal->setGridVisible(false);
     cal->setFirstDayOfWeek(Qt::Monday);
-    cal->setLocale(QLocale(QLocale::French));
+    cal->setLocale(fr);
     cal->setVerticalHeaderFormat(QCalendarWidget::NoVerticalHeader);
-    cal->setMinimumHeight(330);
+    cal->setHorizontalHeaderFormat(QCalendarWidget::ShortDayNames);
+    cal->setMinimumSize(520, 380);
 
-    // colorer chaque jour entre la date de début et la date de fin
+    // en-têtes des jours et week-end
+    QTextCharFormat entJours;
+    entJours.setForeground(QColor("#64748B"));
+    entJours.setFontWeight(QFont::DemiBold);
+    cal->setHeaderTextFormat(entJours);
+    QTextCharFormat weekend;
+    weekend.setForeground(QColor("#94A3B8"));
+    cal->setWeekdayTextFormat(Qt::Saturday, weekend);
+    cal->setWeekdayTextFormat(Qt::Sunday, weekend);
+
+    // chaque jour de compétition coloré selon le statut
     for (const Competition &c : listeComp) {
-        QTextCharFormat format;
-        format.setBackground(QColor(statutBg(c.getStatut())));
-        format.setForeground(QColor(statutFg(c.getStatut())));
-        format.setFontWeight(QFont::Bold);
+        QTextCharFormat f;
+        f.setBackground(QColor(statutBg(c.getStatut())));
+        f.setForeground(QColor(statutFg(c.getStatut())));
+        f.setFontWeight(QFont::Bold);
         for (QDate d = c.getDateDebut(); d.isValid() && d <= c.getDateFin(); d = d.addDays(1))
-            cal->setDateTextFormat(d, format);
+            cal->setDateTextFormat(d, f);
     }
+    // aujourd'hui : orange souligné (par-dessus la couleur de statut éventuelle)
+    {
+        QTextCharFormat f = cal->dateTextFormat(QDate::currentDate());
+        f.setForeground(QColor("#FF6B00"));
+        f.setFontWeight(QFont::Black);
+        f.setFontUnderline(true);
+        cal->setDateTextFormat(QDate::currentDate(), f);
+    }
+    lg->addWidget(cal, 1);
 
-    QLabel *legende = new QLabel(
-        QString("<span style='color:%1'>■</span> Planifiée &nbsp; <span style='color:%2'>■</span> En cours"
-                " &nbsp; <span style='color:%3'>■</span> Terminée")
-            .arg(statutFg("Planifiée"), statutFg("En cours"), statutFg("Terminée")), &dlg);
-    QLabel *titreJour = new QLabel(&dlg);
-    titreJour->setStyleSheet("font-weight:700; font-size:14px;");
-    QLabel *infoJour = new QLabel(&dlg);
-    infoJour->setStyleSheet("color:#64748B; font-size:12px;");
-    QListWidget *jour = new QListWidget(&dlg);
-    QLabel *aide = new QLabel("Clic : afficher la compétition dans le calendrier  ·  "
-                              "Double-clic : l'afficher dans les détails.", &dlg);
-    aide->setStyleSheet("color:#64748B; font-size:11px;");
+    // légende sous forme de pastilles
+    QHBoxLayout *legende = new QHBoxLayout;
+    legende->setSpacing(8);
+    for (const QString &s : STATUTS) {
+        QLabel *p = new QLabel(s, gauche);
+        p->setStyleSheet(QString("background:%1; color:%2; border-radius:10px; padding:3px 12px;"
+                                 "font-size:12px; font-weight:600;").arg(statutBg(s), statutFg(s)));
+        legende->addWidget(p);
+    }
+    QLabel *pAuj = new QLabel("Aujourd'hui", gauche);
+    pAuj->setStyleSheet("color:#FF6B00; font-size:12px; font-weight:700; text-decoration:underline;");
+    legende->addWidget(pAuj);
+    legende->addStretch();
+    lg->addLayout(legende);
+
+    QLabel *resumeMois = new QLabel(gauche);
+    resumeMois->setStyleSheet("color:#475569; font-size:13px;");
+    lg->addWidget(resumeMois);
+
+    // ---------------------------------------------------------------- partie droite
+    QFrame *droite = new QFrame(&dlg);
+    droite->setObjectName("carteCal");
+    QVBoxLayout *ld = new QVBoxLayout(droite);
+    ld->setContentsMargins(16, 16, 16, 16);
+    ld->setSpacing(8);
+    QLabel *titreListe = new QLabel(droite);
+    titreListe->setStyleSheet("font-size:16px; font-weight:800;");
+    QLabel *infoJour = new QLabel(droite);
+    infoJour->setWordWrap(true);
+    infoJour->setStyleSheet("color:#1665E8; font-size:13px; font-weight:600;");
+    QListWidget *liste = new QListWidget(droite);
+    liste->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    liste->setSelectionMode(QAbstractItemView::NoSelection);
+    QLabel *aide = new QLabel("Clic : aller à la date  ·  Double-clic : afficher dans les détails", droite);
+    aide->setStyleSheet("color:#94A3B8; font-size:11px;");
+    ld->addWidget(titreListe);
+    ld->addWidget(infoJour);
+    ld->addWidget(liste, 1);
+    ld->addWidget(aide);
 
     // toutes les compétitions, de la plus ancienne à la plus récente
     QVector<Competition> triees = listeComp;
     std::sort(triees.begin(), triees.end(), [](const Competition &x, const Competition &y) {
         return x.getDateDebut() < y.getDateDebut();
     });
+    titreListe->setText(QString("Toutes les compétitions (%1)").arg(triees.size()));
 
-    // la liste affiche TOUTES les compétitions ; celles du jour choisi sont mises en avant
-    auto remplirJour = [titreJour, infoJour, jour, triees](const QDate &d) {
-        QLocale fr(QLocale::French);
-        titreJour->setText(QString("Toutes les compétitions (%1)").arg(triees.size()));
-        jour->clear();
-        int duJour = 0;
-        QListWidgetItem *premier = nullptr;
-        for (const Competition &c : triees) {
-            const bool ceJour = d >= c.getDateDebut() && d <= c.getDateFin();
-            QListWidgetItem *it = new QListWidgetItem(
-                QString("%1%2  %3   ·   %4 → %5   ·   %6")
-                    .arg(QString(ceJour ? "▶ " : "   "), themeIcon(c.getTheme()), c.getNom(),
-                         c.getDateDebut().toString("dd/MM/yyyy"), c.getDateFin().toString("dd/MM/yyyy"),
-                         c.getStatut()));
-            it->setData(Qt::UserRole, c.getId());
-            it->setForeground(QColor(statutFg(c.getStatut())));
-            if (ceJour) {
-                QFont gras = it->font();
-                gras.setBold(true);
-                it->setFont(gras);
-                it->setBackground(QColor(statutBg(c.getStatut())));
-                if (!premier) premier = it;
-                ++duJour;
-            }
-            jour->addItem(it);
-        }
-        if (triees.isEmpty()) jour->addItem("Aucune compétition enregistrée.");
-        infoJour->setText(QString("Le %1 : %2")
-                              .arg(fr.toString(d, "dddd d MMMM yyyy"),
-                                   duJour == 0 ? QString("aucune compétition")
-                                               : QString("%1 compétition(s), marquée(s) ▶").arg(duJour)));
-        if (premier) jour->scrollToItem(premier);
+    // une carte par compétition ; « cartes » garde le cadre de chaque carte (pour la mise en avant)
+    QVector<QFrame *> cartes;
+    for (const Competition &c : triees) {
+        QListWidgetItem *it = new QListWidgetItem(liste);
+        it->setData(Qt::UserRole, c.getId());
+        QFrame *carte = new QFrame;
+        QHBoxLayout *lc = new QHBoxLayout(carte);
+        lc->setContentsMargins(12, 10, 12, 10);
+        lc->setSpacing(10);
+        QLabel *ico = new QLabel(themeIcon(c.getTheme()));
+        ico->setStyleSheet("font-size:22px; border:0; background:transparent;");
+        QLabel *texte = new QLabel(QString("<b style='font-size:14px'>%1</b><br>"
+                                           "<span style='color:#64748B'>%2 → %3  ·  %4</span>")
+                                       .arg(c.getNom().toHtmlEscaped(),
+                                            fr.toString(c.getDateDebut(), "d MMM yyyy"),
+                                            fr.toString(c.getDateFin(), "d MMM yyyy"),
+                                            c.getTheme().toHtmlEscaped()));
+        texte->setStyleSheet("border:0; background:transparent;");
+        QLabel *badge = new QLabel(c.getStatut());
+        badge->setStyleSheet(QString("background:%1; color:%2; border:0; border-radius:10px; padding:3px 10px;"
+                                     "font-size:11px; font-weight:700;")
+                                 .arg(statutBg(c.getStatut()), statutFg(c.getStatut())));
+        lc->addWidget(ico);
+        lc->addWidget(texte, 1);
+        lc->addWidget(badge, 0, Qt::AlignTop);
+        carte->setProperty("couleurStatut", statutFg(c.getStatut()));
+        it->setSizeHint(carte->sizeHint() + QSize(0, 6));
+        liste->setItemWidget(it, carte);
+        cartes << carte;
+    }
+    if (triees.isEmpty()) {
+        liste->addItem("Aucune compétition enregistrée.");
+    }
+
+    // style d'une carte : normale, ou mise en avant (compétition du jour choisi)
+    auto styler = [](QFrame *carte, bool enAvant) {
+        const QString couleur = carte->property("couleurStatut").toString();
+        carte->setStyleSheet(enAvant
+            ? QString("QFrame { background:#EAF1FF; border:2px solid %1; border-left:6px solid %1;"
+                      " border-radius:10px; }").arg(couleur)
+            : QString("QFrame { background:#FFFFFF; border:1px solid #E2E8F0; border-left:6px solid %1;"
+                      " border-radius:10px; }").arg(couleur));
     };
-    connect(cal, &QCalendarWidget::clicked, &dlg, remplirJour);
-    connect(cal, &QCalendarWidget::selectionChanged, &dlg, [cal, remplirJour]() { remplirJour(cal->selectedDate()); });
 
-    // clic sur une compétition : le calendrier va à sa date de début
-    connect(jour, &QListWidget::itemClicked, &dlg, [this, cal](QListWidgetItem *it) {
+    auto majJour = [=](const QDate &d) {
+        int duJour = 0;
+        int premiere = -1;
+        for (int i = 0; i < triees.size(); ++i) {
+            const bool ceJour = d >= triees.at(i).getDateDebut() && d <= triees.at(i).getDateFin();
+            styler(cartes.at(i), ceJour);
+            if (ceJour) {
+                ++duJour;
+                if (premiere < 0) premiere = i;
+            }
+        }
+        infoJour->setText(QString("%1 : %2").arg(
+            fr.toString(d, "dddd d MMMM yyyy"),
+            duJour == 0 ? QString("aucune compétition ce jour-là")
+                        : QString("%1 compétition(s) en cours (encadrées)").arg(duJour)));
+        if (premiere >= 0) liste->scrollToItem(liste->item(premiere), QAbstractItemView::PositionAtTop);
+    };
+
+    // nombre de compétitions du mois affiché
+    auto majMois = [=](int annee, int mois) {
+        const QDate debutMois(annee, mois, 1);
+        const QDate finMois = debutMois.addMonths(1).addDays(-1);
+        int n = 0;
+        for (const Competition &c : triees)
+            if (c.getDateDebut() <= finMois && c.getDateFin() >= debutMois) ++n;
+        resumeMois->setText(QString("<b>%1</b> : %2 compétition(s) ce mois-ci")
+                                .arg(fr.toString(debutMois, "MMMM yyyy"), QString::number(n)));
+    };
+
+    connect(cal, &QCalendarWidget::selectionChanged, &dlg, [cal, majJour]() { majJour(cal->selectedDate()); });
+    connect(cal, &QCalendarWidget::currentPageChanged, &dlg, majMois);
+    connect(btnAujourdhui, &QPushButton::clicked, &dlg, [cal]() {
+        cal->setSelectedDate(QDate::currentDate());
+        cal->showToday();
+    });
+    connect(liste, &QListWidget::itemClicked, &dlg, [this, cal](QListWidgetItem *it) {
         const int i = indexDeComp(it->data(Qt::UserRole).toInt());
         if (i < 0) return;
         const QDate debut = listeComp.at(i).getDateDebut();
         cal->setCurrentPage(debut.year(), debut.month());
         cal->setSelectedDate(debut);
     });
-    // double-clic : la compétition s'affiche dans la carte « Détails »
-    connect(jour, &QListWidget::itemDoubleClicked, &dlg, [this, &dlg](QListWidgetItem *it) {
+    connect(liste, &QListWidget::itemDoubleClicked, &dlg, [this, &dlg](QListWidgetItem *it) {
         const int id = it->data(Qt::UserRole).toInt();
         if (id <= 0) return;
         idSelectionneComp = id;
@@ -1432,21 +1656,362 @@ void HackTime::ouvrirCalendrierComp()
         dlg.accept();
     });
 
-    // ouvrir sur la compétition sélectionnée (sinon aujourd'hui), au bon mois
+    // ---------------------------------------------------------------- assemblage
+    QHBoxLayout *l = new QHBoxLayout(&dlg);
+    l->setContentsMargins(16, 16, 16, 16);
+    l->setSpacing(16);
+    l->addWidget(gauche, 3);
+    l->addWidget(droite, 2);
+
+    // ouverture sur la compétition sélectionnée (sinon aujourd'hui), au bon mois
     const int i = indexDeComp(idSelectionneComp);
     const QDate depart = i >= 0 ? listeComp.at(i).getDateDebut() : QDate::currentDate();
     cal->setCurrentPage(depart.year(), depart.month());
     cal->setSelectedDate(depart);
-    remplirJour(depart);
-
-    QVBoxLayout *l = new QVBoxLayout(&dlg);
-    l->addWidget(cal);
-    l->addWidget(legende);
-    l->addWidget(titreJour);
-    l->addWidget(infoJour);
-    l->addWidget(jour, 1);
-    l->addWidget(aide);
+    majJour(depart);
+    majMois(depart.year(), depart.month());
     dlg.exec();
+}
+
+// ----- MÉTIER : affiche d'une compétition, dessinée sur une page A4 du PDF
+void HackTime::dessinerAfficheComp(QPainter &p, const Competition &c)
+{
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setRenderHint(QPainter::TextAntialiasing);
+    // on dessine dans un repère de 595 x 842 (taille A4 en points)
+    p.setWindow(0, 0, 595, 842);
+    const QRectF page(0, 0, 595, 842);
+    auto police = [](int taille, int graisse = QFont::Normal) {
+        QFont f("Segoe UI");
+        f.setPixelSize(taille);
+        f.setWeight(QFont::Weight(graisse));
+        return f;
+    };
+    const QStringList x = infosComp.value(c.getId(), VIDE);
+    QLocale fr(QLocale::French);
+
+    // fond : dégradé bleu nuit -> bleu, avec deux cercles décoratifs
+    QLinearGradient fond(0, 0, 595, 842);
+    fond.setColorAt(0.0, QColor("#0B1B3A"));
+    fond.setColorAt(0.6, QColor("#12317A"));
+    fond.setColorAt(1.0, QColor("#1665E8"));
+    p.fillRect(page, fond);
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(255, 107, 0, 40));
+    p.drawEllipse(QPointF(560, 90), 170, 170);
+    p.setBrush(QColor(255, 255, 255, 18));
+    p.drawEllipse(QPointF(40, 780), 200, 200);
+
+    // logo
+    QImage logo(":/images/logo_hacktime_clair.png");
+    if (!logo.isNull()) {
+        const QSizeF t = QSizeF(logo.size()).scaled(QSizeF(190, 70), Qt::KeepAspectRatio);
+        p.drawImage(QRectF((595 - t.width()) / 2, 40, t.width(), t.height()), logo);
+    }
+
+    // bandeau thème
+    p.setPen(QColor("#FF8A3D"));
+    p.setFont(police(14, QFont::Bold));
+    p.drawText(QRectF(40, 130, 515, 22), Qt::AlignCenter,
+               QString("HACKATHON  ·  %1").arg(c.getTheme().toUpper()));
+
+    // titre
+    p.setPen(Qt::white);
+    p.setFont(police(44, QFont::Black));
+    QRectF zoneTitre(40, 160, 515, 150);
+    QRectF utilise = p.boundingRect(zoneTitre, Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap, c.getNom());
+    if (utilise.height() > 150) p.setFont(police(32, QFont::Black));
+    p.drawText(zoneTitre, Qt::AlignHCenter | Qt::AlignVCenter | Qt::TextWordWrap, c.getNom());
+
+    // bloc dates (orange)
+    const QRectF blocDates(95, 325, 405, 70);
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor("#FF6B00"));
+    p.drawRoundedRect(blocDates, 14, 14);
+    p.setPen(Qt::white);
+    p.setFont(police(13, QFont::DemiBold));
+    p.drawText(blocDates.adjusted(0, 8, 0, -38), Qt::AlignCenter, "DATES");
+    p.setFont(police(20, QFont::Bold));
+    const QString dates = c.getDateDebut() == c.getDateFin()
+        ? fr.toString(c.getDateDebut(), "d MMMM yyyy")
+        : QString("Du %1 au %2").arg(fr.toString(c.getDateDebut(), "d MMMM"),
+                                     fr.toString(c.getDateFin(), "d MMMM yyyy"));
+    p.drawText(blocDates.adjusted(0, 28, 0, -6), Qt::AlignCenter, dates);
+
+    // quatre cartes d'information
+    const QString lieu = c.getMode() == "En ligne" ? QString("En ligne") : (x.value(0).isEmpty() ? QString("À préciser") : x.value(0));
+    const QList<QPair<QString, QString>> infos = {
+        {"MODE", c.getMode()},
+        {"LIEU", lieu},
+        {"ÉQUIPES", QString("%1 membres max").arg(c.getNbMaxMembres())},
+        {"JURY", c.getNomJury().isEmpty() ? QString("À annoncer") : c.getNomJury()}};
+    for (int k = 0; k < infos.size(); ++k) {
+        const QRectF carte(40 + (k % 2) * 262.5, 420 + (k / 2) * 86, 252.5, 74);
+        p.setPen(QPen(QColor(255, 255, 255, 60), 1));
+        p.setBrush(QColor(255, 255, 255, 26));
+        p.drawRoundedRect(carte, 12, 12);
+        p.setPen(QColor("#9DB8F5"));
+        p.setFont(police(11, QFont::Bold));
+        p.drawText(carte.adjusted(16, 10, -16, -44), Qt::AlignLeft | Qt::AlignVCenter, infos[k].first);
+        p.setPen(Qt::white);
+        p.setFont(police(17, QFont::Bold));
+        p.drawText(carte.adjusted(16, 30, -16, -8), Qt::AlignLeft | Qt::AlignVCenter | Qt::TextWordWrap,
+                   infos[k].second);
+    }
+
+    // description
+    if (!x.value(2).isEmpty()) {
+        p.setPen(QColor("#DCE6FA"));
+        p.setFont(police(13));
+        p.drawText(QRectF(50, 600, 495, 90), Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap, x.value(2));
+    }
+
+    // sponsors
+    if (!x.value(3).isEmpty()) {
+        p.setPen(QColor("#9DB8F5"));
+        p.setFont(police(11, QFont::Bold));
+        p.drawText(QRectF(40, 700, 515, 18), Qt::AlignCenter, "AVEC LE SOUTIEN DE");
+        p.setPen(Qt::white);
+        p.setFont(police(15, QFont::Bold));
+        p.drawText(QRectF(40, 720, 515, 40), Qt::AlignCenter | Qt::TextWordWrap,
+                   QString(x.value(3)).replace(",", "  ·  "));
+    }
+
+    // pied de page
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0, 0, 0, 70));
+    p.drawRect(QRectF(0, 782, 595, 60));
+    p.setPen(Qt::white);
+    p.setFont(police(15, QFont::Bold));
+    p.drawText(QRectF(40, 782, 330, 60), Qt::AlignLeft | Qt::AlignVCenter, "Inscriptions ouvertes · HackTime");
+    const QRectF pastille(430, 799, 125, 26);
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(statutBg(c.getStatut())));
+    p.drawRoundedRect(pastille, 13, 13);
+    p.setPen(QColor(statutFg(c.getStatut())));
+    p.setFont(police(12, QFont::Bold));
+    p.drawText(pastille, Qt::AlignCenter, c.getStatut());
+
+    p.restore();
+}
+
+// ----- MÉTIER : statistiques dans l'onglet « Statistiques » (comme le module Employés)
+void HackTime::ouvrirStatistiquesComp()
+{
+    ui->ongletsComp->setCurrentWidget(ui->ongletStatsComp);
+}
+
+// construit (ou reconstruit) le contenu de l'onglet des statistiques
+void HackTime::remplirOngletStatsComp()
+{
+    QScrollArea *zone = ui->zoneStatsComp;
+
+    // ---- calculs (à partir des compétitions lues dans Oracle)
+    const int total = int(listeComp.size());
+    int places = 0;
+    QMap<QString, int> parStatut, parTheme, parMode;
+    for (const Competition &c : listeComp) {
+        places += c.getNbMaxMembres();
+        parStatut[c.getStatut()]++;
+        parTheme[c.getTheme()]++;
+        parMode[c.getMode()]++;
+    }
+    const int faites = parStatut.value("En cours") + parStatut.value("Terminée");
+    const int taux = total ? qRound(100.0 * faites / total) : 0;
+
+    QWidget *contenu = new QWidget;
+    QVBoxLayout *l = new QVBoxLayout(contenu);
+    l->setContentsMargins(0, 0, 8, 0);
+    l->setSpacing(14);
+
+    auto carte = [](const QString &titre) {
+        QFrame *fr = new QFrame;
+        fr->setObjectName("carteStat");
+        QVBoxLayout *lc = new QVBoxLayout(fr);
+        lc->setContentsMargins(18, 14, 18, 16);
+        lc->setSpacing(10);
+        QLabel *t = new QLabel(titre);
+        t->setStyleSheet("font-size:16px; font-weight:800;");
+        lc->addWidget(t);
+        return fr;
+    };
+
+    // ---- 4 indicateurs
+    QHBoxLayout *kpis = new QHBoxLayout;
+    kpis->setSpacing(12);
+    const QList<QStringList> valeurs = {
+        {"🏆", "Compétitions", QString::number(total), "#1665E8"},
+        {"🪑", "Places (membres max)", QString::number(places), "#10B981"},
+        {"👤", "Participants estimés", QString::number(places * 4), "#FF6B00"},
+        {"📈", "Taux de participation", QString::number(taux) + " %", "#7C3AED"}};
+    for (const QStringList &v : valeurs) {
+        QFrame *k = new QFrame;
+        k->setObjectName("carteStat");
+        QVBoxLayout *lk = new QVBoxLayout(k);
+        lk->setContentsMargins(16, 12, 16, 12);
+        QLabel *haut = new QLabel(v[0] + "  " + v[1]);
+        haut->setStyleSheet("color:#64748B; font-size:13px;");
+        QLabel *chiffre = new QLabel(v[2]);
+        chiffre->setStyleSheet(QString("color:%1; font-size:30px; font-weight:800;").arg(v[3]));
+        lk->addWidget(haut);
+        lk->addWidget(chiffre);
+        kpis->addWidget(k);
+    }
+    l->addLayout(kpis);
+
+    // ---- courbes par mois (même dessin que la carte de la page, en grand)
+    QFrame *cCourbes = carte("Évolution par mois (date de début)");
+    QWidget *zoneCourbes = new QWidget;
+    zoneCourbes->setMinimumHeight(300);
+    zoneCourbes->installEventFilter(this);
+    zoneCourbesStatsComp = zoneCourbes;
+    cCourbes->layout()->addWidget(zoneCourbes);
+    QLabel *note = new QLabel("Courbe bleue : somme des « membres max » des compétitions qui commencent ce mois-là. "
+                              "Courbe orange : participants estimés (4 par équipe).");
+    note->setWordWrap(true);
+    note->setStyleSheet("color:#94A3B8; font-size:11px;");
+    cCourbes->layout()->addWidget(note);
+    l->addWidget(cCourbes);
+
+    // ---- répartitions : une barre par valeur
+    auto repartition = [&](const QString &titre, const QMap<QString, int> &donnees,
+                           const std::function<QString(const QString &)> &couleur,
+                           const std::function<QString(const QString &)> &icone) {
+        QFrame *c = carte(titre);
+        QList<QPair<int, QString>> lignes;
+        for (auto it = donnees.cbegin(); it != donnees.cend(); ++it) lignes.append({it.value(), it.key()});
+        std::sort(lignes.begin(), lignes.end(), [](const QPair<int, QString> &a, const QPair<int, QString> &b) {
+            return a.first != b.first ? a.first > b.first : a.second < b.second;
+        });
+        if (lignes.isEmpty()) {
+            QLabel *vide = new QLabel("Aucune donnée");
+            vide->setStyleSheet("color:#94A3B8;");
+            c->layout()->addWidget(vide);
+        }
+        for (const auto &li : lignes) {
+            QWidget *ligne = new QWidget;
+            QHBoxLayout *lh = new QHBoxLayout(ligne);
+            lh->setContentsMargins(0, 0, 0, 0);
+            QLabel *nom = new QLabel(icone(li.second) + "  " + li.second);
+            nom->setMinimumWidth(150);
+            QProgressBar *b = new QProgressBar;
+            b->setRange(0, qMax(1, total));
+            b->setValue(li.first);
+            b->setTextVisible(false);
+            b->setFixedHeight(10);
+            b->setStyleSheet(QString("QProgressBar::chunk { background:%1; border-radius:5px; }").arg(couleur(li.second)));
+            QLabel *nb = new QLabel(QString("%1  (%2 %)").arg(li.first)
+                                        .arg(total ? qRound(100.0 * li.first / total) : 0));
+            nb->setMinimumWidth(70);
+            nb->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+            lh->addWidget(nom);
+            lh->addWidget(b, 1);
+            lh->addWidget(nb);
+            c->layout()->addWidget(ligne);
+        }
+        static_cast<QVBoxLayout *>(c->layout())->addStretch();
+        return c;
+    };
+    QHBoxLayout *bas = new QHBoxLayout;
+    bas->setSpacing(12);
+    bas->addWidget(repartition("Par statut", parStatut,
+                               [](const QString &s) { return statutFg(s); },
+                               [](const QString &) { return QString("●"); }));
+    bas->addWidget(repartition("Par mode", parMode,
+                               [](const QString &) { return QString("#1665E8"); },
+                               [](const QString &m) { return modeIcon(m); }));
+    l->addLayout(bas);
+    l->addWidget(repartition("Par thème", parTheme,
+                             [](const QString &) { return QString("#FF6B00"); },
+                             [](const QString &t) { return themeIcon(t); }));
+    l->addStretch();
+
+    zone->setWidget(contenu);   // l'ancien contenu est supprimé par la QScrollArea
+}
+
+// ----- SCÉNARIO ARDUINO : borne de suivi des compétitions
+//  Arduino -> Qt : "N" (bouton SUIVANTE), "S" (bouton STATUT)
+//  Qt -> Arduino : "C|ligne1|ligne2" (affichage), "A|..|.." (alerte + 3 bips), "B" (bip)
+//  Le bouton STATUT fait un UPDATE dans Oracle (Planifiée -> En cours -> Terminée).
+void HackTime::initArduinoComp()
+{
+    const int r = arduinoComp.connect_arduino();
+    if (r != 0) {
+        ui->bellComp->setToolTip(r == -1 ? "Borne Arduino non branchée" : "Borne Arduino : port occupé");
+        return;
+    }
+    ui->bellComp->setToolTip("Borne Arduino connectée sur " + arduinoComp.getarduino_port_name());
+    connect(arduinoComp.getserial(), &QSerialPort::readyRead, this, &HackTime::lireArduinoComp);
+}
+
+// texte pour l'écran LCD : sans accents et coupé à 16 caractères
+static QString texteLcd(const QString &t)
+{
+    QString s = t.normalized(QString::NormalizationForm_D);
+    s.remove(QRegularExpression("[^\\x20-\\x7E]"));
+    return s.left(16);
+}
+
+// envoie à la borne la compétition numéro indexArduinoComp (liste triée comme le tableau)
+void HackTime::envoyerArduinoComp(bool alerte)
+{
+    if (!arduinoComp.estConnecte()) return;
+    QString l1 = "Aucune", l2 = "competition";
+    if (!listeComp.isEmpty()) {
+        indexArduinoComp = (indexArduinoComp % listeComp.size() + listeComp.size()) % listeComp.size();
+        const Competition &c = listeComp.at(indexArduinoComp);
+        const int jours = QDate::currentDate().daysTo(c.getDateDebut());
+        const QString quand = c.getStatut() == "Planifiée"
+                                  ? (jours > 0 ? QString("J-%1").arg(jours) : QString("auj."))
+                                  : (c.getStatut() == "En cours" ? QString("live") : QString("fini"));
+        l1 = c.getNom();
+        l2 = QString("%1 %2").arg(c.getStatut(), quand);
+    }
+    arduinoComp.write_to_arduino(QString("%1|%2|%3\n").arg(QString(alerte ? "A" : "C"), texteLcd(l1), texteLcd(l2)).toLatin1());
+}
+
+// au démarrage de la session : alerte si une compétition planifiée commence aujourd'hui
+void HackTime::alerteArduinoComp()
+{
+    for (int i = 0; i < listeComp.size(); ++i) {
+        const Competition &c = listeComp.at(i);
+        if (c.getStatut() == "Planifiée" && c.getDateDebut() == QDate::currentDate()) {
+            indexArduinoComp = i;
+            envoyerArduinoComp(true);
+            return;
+        }
+    }
+    envoyerArduinoComp(false);
+}
+
+// lecture des commandes de la borne (une commande par ligne)
+void HackTime::lireArduinoComp()
+{
+    tamponArduinoComp += arduinoComp.read_from_arduino();
+    int fin;
+    while ((fin = tamponArduinoComp.indexOf('\n')) >= 0) {
+        const QString cmd = QString::fromLatin1(tamponArduinoComp.left(fin)).trimmed();
+        tamponArduinoComp.remove(0, fin + 1);
+        if (roleComp.isEmpty() || listeComp.isEmpty()) continue;   // personne de connecté au module
+
+        if (cmd == "N") {                       // compétition suivante
+            ++indexArduinoComp;
+            envoyerArduinoComp(false);
+        } else if (cmd == "S") {                // statut suivant, enregistré dans Oracle
+            const Competition c = listeComp.at(indexArduinoComp % listeComp.size());
+            const QString suivant = c.getStatut() == "Planifiée" ? "En cours"
+                                  : c.getStatut() == "En cours"  ? "Terminée" : "Planifiée";
+            if (Competition::changerStatut(c.getId(), suivant)) {
+                const int id = c.getId();
+                afficherComp();                 // relit Oracle (tableau, statistiques...)
+                for (int i = 0; i < listeComp.size(); ++i)
+                    if (listeComp.at(i).getId() == id) indexArduinoComp = i;
+                arduinoComp.write_to_arduino("B\n");
+                envoyerArduinoComp(false);
+            }
+        }
+    }
 }
 
 // =====================================================================

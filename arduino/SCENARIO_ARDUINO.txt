@@ -1,0 +1,61 @@
+HACKTIME - SCÉNARIO ARDUINO DU MODULE « GESTION DES COMPÉTITIONS »
+=====================================================================
+« Borne de suivi des compétitions » (demi-scénario qui passe par la base Oracle)
+
+IDÉE
+  Une petite borne posée à l'accueil du hackathon affiche les compétitions
+  enregistrées dans la base Oracle. L'organisateur peut les faire défiler et
+  faire avancer leur statut directement depuis la borne (sans clavier ni souris).
+
+FONCTIONNEMENT (Qt <-> Arduino <-> Oracle)
+  1. Au démarrage, l'application Qt se connecte à la carte (classe Arduino, port USB série, 9600 bauds).
+  2. Après la connexion (hacktime123 ou yosr123), Qt lit les compétitions dans Oracle
+     (SELECT ... FROM COMPETITION) et envoie la première à la borne :
+        écran LCD :  « AI for Good     »
+                     « Planifiee J-3   »
+     Si une compétition PLANIFIÉE commence aujourd'hui : alerte = message + 3 bips.
+  3. Bouton SUIVANTE  -> l'Arduino envoie "N" -> Qt envoie la compétition suivante.
+  4. Bouton STATUT    -> l'Arduino envoie "S" -> Qt fait dans Oracle :
+        UPDATE COMPETITION SET STATUT = ... WHERE ID_COMPETITION = ...
+        (Planifiée -> En cours -> Terminée -> Planifiée)
+     puis relit la base : le tableau, les statistiques et l'écran LCD sont mis à jour,
+     et la borne fait un bip de confirmation.
+  5. Toute modification faite dans l'application (ajout, modification, suppression)
+     est aussi renvoyée à l'écran de la borne.
+
+PROTOCOLE SÉRIE (une ligne = une commande, terminée par '\n')
+  Arduino -> Qt :  N  (suivante)     S  (changer le statut)
+  Qt -> Arduino :  C|ligne1|ligne2   afficher
+                   A|ligne1|ligne2   alerte (afficher + 3 bips)
+                   B                 bip de confirmation
+
+COMPOSANTS (récupérés / recyclables)
+  - Arduino Uno (ou clone CH340)
+  - Écran LCD 16x2 avec module I2C (récupéré d'un ancien appareil / kit)
+  - 2 boutons poussoirs (récupérés d'une vieille télécommande, d'un clavier ou d'un jouet)
+  - 1 buzzer (récupéré d'une ancienne carte mère de PC ou d'un jouet)
+  - Fils récupérés d'anciens câbles (câble réseau / USB)
+  - Boîtier : boîte en carton recyclée (trous pour l'écran et les boutons)
+
+CÂBLAGE
+  LCD I2C   : SDA -> A4   SCL -> A5   VCC -> 5V   GND -> GND
+  SUIVANTE  : broche D2 <-> GND
+  STATUT    : broche D3 <-> GND      (résistances de tirage internes : INPUT_PULLUP)
+  Buzzer    : + -> D8    - -> GND
+
+INSTALLATION
+  1. Arduino IDE : installer la bibliothèque « LiquidCrystal I2C » (Frank de Brabander),
+     ouvrir arduino/borne_competitions/borne_competitions.ino, choisir la carte et le port,
+     puis Téléverser. FERMER le moniteur série ensuite (sinon le port est occupé).
+  2. Qt : le module « Qt Serial Port » doit être installé
+     (Qt Maintenance Tool -> Qt 6.7.3 -> Additional Libraries -> Qt Serial Port).
+     Le .pro contient déjà : QT += serialport
+  3. Lancer HackTime avec la carte branchée. Le survol de la cloche 🔔 de la page
+     Compétitions indique si la borne est connectée.
+
+OÙ EST LE CODE
+  arduino.h / arduino.cpp        classe Arduino (connexion, lecture, écriture)
+  competition.cpp                Competition::changerStatut()  -> UPDATE dans Oracle
+  hacktime.cpp (zone COMPETITION) initArduinoComp, envoyerArduinoComp,
+                                 alerteArduinoComp, lireArduinoComp
+  arduino/borne_competitions/borne_competitions.ino   programme de la carte

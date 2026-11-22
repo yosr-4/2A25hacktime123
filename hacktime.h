@@ -14,11 +14,14 @@
 #define HACKTIME_H
 
 #include <QMainWindow>
+#include <QDialog>
+#include <QPointer>
 #include <QMap>
 #include <QPixmap>
 #include <QStringList>
 #include <QVector>
 #include "competition.h"
+#include "arduino.h"
 #include "employe.h"
 
 #include <QList>
@@ -29,6 +32,7 @@ class QMenu;
 class QTimer;
 class StatsWidget;
 
+class QPainter;
 class QPropertyAnimation;
 
 QT_BEGIN_NAMESPACE
@@ -115,6 +119,11 @@ private slots:
     void ajouterEmployesDemo();
 
 private:
+    // ----- accès : chaque compte n'ouvre que sa gestion (colonne ACCES de EMPLOYE)
+    void limiterAcces(const QString &module);
+    bool accesAutorise(const QString &module);
+    QString accesModule = "TOUT";
+
     // ----- initialisation de chaque module (une méthode par module)
     void initCompetition();
     void initEquipe();
@@ -149,6 +158,9 @@ private:
     void exporterPdfComp();
     void exporterExcelComp();
     void afficherFichierComp(const QString &titre, const QString &chemin);
+    void dessinerAfficheComp(QPainter &p, const Competition &c);   // affiche A4 d'une compétition
+    void ouvrirStatistiquesComp();                      // onglet « Statistiques »
+    void remplirOngletStatsComp();
     // affichage
     void preparerFenetreComp();
     void afficherDetailsComp();
@@ -171,6 +183,15 @@ private:
     QVector<double> equipesParMoisComp, participantsParMoisComp;
     QPixmap fondLogin, fondLoginAjuste;
     QPropertyAnimation *clignotementLoginComp = nullptr;
+    // scénario Arduino (borne de suivi des compétitions)
+    void initArduinoComp();
+    void envoyerArduinoComp(bool alerte);
+    void alerteArduinoComp();
+    void lireArduinoComp();
+    Arduino arduinoComp;
+    QByteArray tamponArduinoComp;
+    int indexArduinoComp = 0;
+    QPointer<QWidget> zoneCourbesStatsComp;  // zone du graphique dans l'onglet Statistiques
 
     // ----- MODULE EMPLOYE
     void preparerBarreHauteEmp();

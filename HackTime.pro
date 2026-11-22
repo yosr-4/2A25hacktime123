@@ -1,4 +1,4 @@
-QT += core gui widgets sql printsupport
+QT += core gui widgets sql printsupport serialport
 
 CONFIG += c++17
 
@@ -9,6 +9,7 @@ TEMPLATE = app
 msvc: QMAKE_CXXFLAGS += /utf-8
 
 SOURCES += \
+    arduino.cpp \
     competition.cpp \
     connection.cpp \
     employe.cpp \
@@ -17,6 +18,7 @@ SOURCES += \
     statsemploye.cpp
 
 HEADERS += \
+    arduino.h \
     competition.h \
     connection.h \
     employe.h \

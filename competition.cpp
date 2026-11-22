@@ -205,3 +205,35 @@ QList<QPair<int, QString>> Competition::listerJurys()
                       query.value(1).toString().trimmed() + " " + query.value(2).toString().trimmed()});
     return jurys;
 }
+
+// Connexion à l'application : on cherche l'employé dans la table EMPLOYE (LOGIN + MDP).
+// La colonne ACCES dit quelle gestion il peut ouvrir. Si elle est vide :
+// ADMINISTRATEUR -> TOUT, autre rôle -> EMPLOYES. Renvoie une chaîne vide si le compte est inconnu.
+QString Competition::accesConnexion(const QString &login, const QString &mdp)
+{
+    QSqlQuery query;
+    query.prepare("SELECT NVL(ACCES, CASE ROLE WHEN 'ADMINISTRATEUR' THEN 'TOUT' ELSE 'EMPLOYES' END) "
+                  "FROM EMPLOYE WHERE LOGIN = :login AND MDP = :mdp");
+    query.bindValue(":login", login);
+    query.bindValue(":mdp", mdp);
+    if (!query.exec()) {
+        // colonne ACCES pas encore créée (script comptes_connexion.sql non exécuté) : accès selon le rôle
+        query.prepare("SELECT CASE ROLE WHEN 'ADMINISTRATEUR' THEN 'TOUT' ELSE 'EMPLOYES' END "
+                      "FROM EMPLOYE WHERE LOGIN = :login AND MDP = :mdp");
+        query.bindValue(":login", login);
+        query.bindValue(":mdp", mdp);
+        if (!executer(query, "Connexion")) return QString();
+    }
+    if (!query.next()) return QString();
+    return query.value(0).toString().trimmed().toUpper();
+}
+
+// Scénario Arduino : le bouton STATUT de la borne fait avancer le statut dans Oracle
+bool Competition::changerStatut(int id, const QString &statut)
+{
+    QSqlQuery query;
+    query.prepare("UPDATE COMPETITION SET STATUT = :statut WHERE ID_COMPETITION = :id");
+    query.bindValue(":statut", statutVersCode(statut));
+    query.bindValue(":id", id);
+    return executer(query, "Changement de statut");
+}

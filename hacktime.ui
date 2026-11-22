@@ -1443,7 +1443,24 @@ QProgressBar#themeBar::chunk { background: #1665E8; border-radius: 4px; }
                       </widget>
                      </item>
                      <item>
-                      <widget class="QFrame" name="cardListComp">
+                      <widget class="QTabWidget" name="ongletsComp">
+ <property name="currentIndex">
+  <number>0</number>
+ </property>
+ <property name="documentMode">
+  <bool>true</bool>
+ </property>
+ <widget class="QWidget" name="ongletListeComp">
+  <attribute name="title">
+   <string>📋  Liste des compétitions</string>
+  </attribute>
+  <layout class="QVBoxLayout" name="layoutOngletListeComp">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>10</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item>
+<widget class="QFrame" name="cardListComp">
                        <property name="card" stdset="0">
                         <bool>true</bool>
                        </property>
@@ -1687,6 +1704,28 @@ QProgressBar#themeBar::chunk { background: #1665E8; border-radius: 4px; }
                         </item>
                        </layout>
                       </widget>
+   </item>
+  </layout>
+ </widget>
+ <widget class="QWidget" name="ongletStatsComp">
+  <attribute name="title">
+   <string>📊  Statistiques</string>
+  </attribute>
+  <layout class="QVBoxLayout" name="layoutOngletStatsComp">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>10</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item>
+    <widget class="QScrollArea" name="zoneStatsComp">
+     <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+     <property name="widgetResizable"><bool>true</bool></property>
+     <widget class="QWidget" name="contenuStatsComp"/>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+</widget>
                      </item>
                     </layout>
                    </widget>
