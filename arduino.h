@@ -6,8 +6,22 @@
 #define ARDUINO_H
 
 #include <QByteArray>
-#include <QSerialPort>
+#include <QObject>
 #include <QString>
+
+#ifndef SANS_SERIALPORT
+#include <QSerialPort>
+#else
+// Qt Serial Port non installé : classe vide qui permet de compiler sans la borne Arduino.
+class QSerialPort : public QObject
+{
+    Q_OBJECT
+public:
+    bool isOpen() const { return false; }
+signals:
+    void readyRead();
+};
+#endif
 
 class Arduino
 {

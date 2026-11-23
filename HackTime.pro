@@ -1,4 +1,13 @@
-QT += core gui widgets sql printsupport serialport
+QT += core gui widgets sql printsupport
+
+# Borne Arduino : nécessite le module Qt Serial Port.
+# S'il n'est pas installé, l'application compile quand même (sans la borne).
+qtHaveModule(serialport) {
+    QT += serialport
+} else {
+    DEFINES += SANS_SERIALPORT
+    message("Module Qt Serial Port absent : borne Arduino desactivee")
+}
 
 CONFIG += c++17
 
@@ -15,6 +24,9 @@ SOURCES += \
     employe.cpp \
     hacktime.cpp \
     main.cpp \
+    participant.cpp \
+    participantborne.cpp \
+    participantui.cpp \
     statsemploye.cpp
 
 HEADERS += \
@@ -23,6 +35,9 @@ HEADERS += \
     connection.h \
     employe.h \
     hacktime.h \
+    participant.h \
+    participantborne.h \
+    participantui.h \
     statsemploye.h
 
 FORMS += \

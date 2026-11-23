@@ -4339,9 +4339,6 @@ QProgressBar#themeBar::chunk { background: #1665E8; border-radius: 4px; }
              <property name="checkable">
               <bool>true</bool>
              </property>
-             <property name="checked">
-              <bool>true</bool>
-             </property>
              <property name="autoExclusive">
               <bool>true</bool>
              </property>
@@ -4372,6 +4369,9 @@ QProgressBar#themeBar::chunk { background: #1665E8; border-radius: 4px; }
               <string>👤   Participants</string>
              </property>
              <property name="checkable">
+              <bool>true</bool>
+             </property>
+             <property name="checked">
               <bool>true</bool>
              </property>
              <property name="autoExclusive">
@@ -4445,128 +4445,456 @@ QProgressBar#themeBar::chunk { background: #1665E8; border-radius: 4px; }
         </item>
         <item>
          <widget class="QWidget" name="contenuParticipants">
-          <property name="minimumSize">
+      <property name="styleSheet">
+       <string notr="true">QWidget#contenuParticipants { background-color: #f8fafc; }</string>
+      </property>
+      <layout class="QVBoxLayout" name="contentLayoutPart">
+       <property name="spacing">
+        <number>12</number>
+       </property>
+       <property name="leftMargin">
+        <number>16</number>
+       </property>
+       <property name="topMargin">
+        <number>14</number>
+       </property>
+       <property name="rightMargin">
+        <number>16</number>
+       </property>
+       <property name="bottomMargin">
+        <number>14</number>
+       </property>
+       <item>
+        <layout class="QHBoxLayout" name="topHeaderLayoutPart">
+         <item>
+          <widget class="QLabel" name="pageTitlePart">
+           <property name="styleSheet">
+            <string notr="true">font-size: 22px; font-weight: bold; color: #0f172a;</string>
+           </property>
+           <property name="text">
+            <string>Gestion des Participants</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+         <spacer name="headerSpacerPart">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
            <size>
-            <width>990</width>
-            <height>560</height>
+            <width>40</width>
+            <height>20</height>
            </size>
           </property>
-          <widget class="QPushButton" name="pushButtonPart">
-           <property name="geometry">
-            <rect>
-             <x>600</x>
-             <y>330</y>
-             <width>111</width>
-             <height>29</height>
-            </rect>
+         </spacer>
+        </item>
+         <item>
+          <widget class="QPushButton" name="btnPdfPart">
+           <property name="styleSheet">
+            <string notr="true">QPushButton { background-color: #ffffff; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 6px; color: #0f172a; font-weight: 600; font-size: 12px; }
+QPushButton:hover { background-color: #f1f5f9; border-color: #94a3b8; }</string>
            </property>
            <property name="text">
-            <string>Ajouter client </string>
+            <string>📥  PDF</string>
            </property>
           </widget>
-          <widget class="QLineEdit" name="lineEditPart">
-           <property name="geometry">
-            <rect>
-             <x>410</x>
-             <y>290</y>
-             <width>113</width>
-             <height>26</height>
-            </rect>
-           </property>
-          </widget>
-          <widget class="QLineEdit" name="lineEdit_2Part">
-           <property name="geometry">
-            <rect>
-             <x>410</x>
-             <y>330</y>
-             <width>113</width>
-             <height>26</height>
-            </rect>
-           </property>
-          </widget>
-          <widget class="QLineEdit" name="lineEdit_3Part">
-           <property name="geometry">
-            <rect>
-             <x>410</x>
-             <y>370</y>
-             <width>113</width>
-             <height>26</height>
-            </rect>
-           </property>
-          </widget>
-          <widget class="QLineEdit" name="lineEdit_4Part">
-           <property name="geometry">
-            <rect>
-             <x>410</x>
-             <y>410</y>
-             <width>113</width>
-             <height>26</height>
-            </rect>
-           </property>
-          </widget>
-          <widget class="QTableView" name="tableViewPart">
-           <property name="geometry">
-            <rect>
-             <x>300</x>
-             <y>60</y>
-             <width>421</width>
-             <height>192</height>
-            </rect>
-           </property>
-          </widget>
-          <widget class="QLabel" name="labelPart">
-           <property name="geometry">
-            <rect>
-             <x>300</x>
-             <y>290</y>
-             <width>63</width>
-             <height>20</height>
-            </rect>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnExcelPart">
+           <property name="styleSheet">
+            <string notr="true">QPushButton { background-color: #ffffff; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 6px; color: #0f172a; font-weight: 600; font-size: 12px; }
+QPushButton:hover { background-color: #f1f5f9; border-color: #94a3b8; }</string>
            </property>
            <property name="text">
-            <string>CIN:</string>
+            <string>📥  Excel</string>
            </property>
           </widget>
-          <widget class="QLabel" name="label_2Part">
-           <property name="geometry">
-            <rect>
-             <x>300</x>
-             <y>330</y>
-             <width>63</width>
-             <height>20</height>
-            </rect>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="statsLayoutPart">
+         <property name="spacing">
+          <number>20</number>
+         </property>
+
+         <item>
+          <widget class="QFrame" name="card1Part">
+           <property name="styleSheet">
+            <string notr="true">QFrame#card1Part { background-color: #ffffff; border-radius: 12px; padding: 15px; border: 1px solid #e2e8f0; }</string>
            </property>
-           <property name="text">
-            <string>NOM:</string>
-           </property>
+           <layout class="QVBoxLayout" name="c1LayoutPart">
+            <item>
+             <widget class="QLabel" name="c1TitlePart">
+              <property name="styleSheet">
+               <string notr="true">color: #475569; font-weight: 600; font-size: 13px;</string>
+              </property>
+              <property name="text">
+               <string>Participants Actifs (SQL)</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="lblActifsPart">
+              <property name="styleSheet">
+               <string notr="true">font-size: 28px; font-weight: bold; color: #0f172a;</string>
+              </property>
+              <property name="text">
+               <string>0</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </widget>
-          <widget class="QLabel" name="label_3Part">
-           <property name="geometry">
-            <rect>
-             <x>300</x>
-             <y>370</y>
-             <width>63</width>
-             <height>20</height>
-            </rect>
+         </item>
+
+         <item>
+          <widget class="QFrame" name="card2Part">
+           <property name="styleSheet">
+            <string notr="true">QFrame#card2Part { background-color: #ffffff; border-radius: 12px; padding: 15px; border: 1px solid #e2e8f0; }</string>
            </property>
-           <property name="text">
-            <string>PRENOM:</string>
-           </property>
+           <layout class="QVBoxLayout" name="c2LayoutPart">
+            <item>
+             <widget class="QLabel" name="c2TitlePart">
+              <property name="styleSheet">
+               <string notr="true">color: #475569; font-weight: 600; font-size: 13px;</string>
+              </property>
+              <property name="text">
+               <string>Nouveaux Inscrits</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="lblNouveauxPart">
+              <property name="styleSheet">
+               <string notr="true">font-size: 28px; font-weight: bold; color: #ea580c;</string>
+              </property>
+              <property name="text">
+               <string>0</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </widget>
-          <widget class="QLabel" name="label_4Part">
-           <property name="geometry">
-            <rect>
-             <x>300</x>
-             <y>410</y>
-             <width>63</width>
-             <height>20</height>
-            </rect>
+         </item>
+
+         <item>
+          <widget class="QFrame" name="card3Part">
+           <property name="styleSheet">
+            <string notr="true">QFrame#card3Part { background-color: #ffffff; border-radius: 12px; padding: 15px; border: 1px solid #e2e8f0; }</string>
            </property>
-           <property name="text">
-            <string>AGE:</string>
-           </property>
+           <layout class="QVBoxLayout" name="c3LayoutPart">
+            <item>
+             <widget class="QLabel" name="c3TitlePart">
+              <property name="styleSheet">
+               <string notr="true">color: #475569; font-weight: 600; font-size: 13px;</string>
+              </property>
+              <property name="text">
+               <string>Statistiques Participants</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnStatsDialogPart">
+              <property name="styleSheet">
+               <string notr="true">QPushButton { background-color: #2563eb; color: white; padding: 6px 10px; font-weight: bold; border-radius: 6px; font-size: 11px; border: none; }
+QPushButton:hover { background-color: #1d4ed8; }</string>
+              </property>
+              <property name="text">
+               <string>📊  Statistiques</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </widget>
-         </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="middleLayoutPart" stretch="3,1">
+         <property name="spacing">
+          <number>20</number>
+         </property>
+         <item>
+          <widget class="QFrame" name="tableCardPart">
+           <property name="styleSheet">
+            <string notr="true">QFrame#tableCardPart { background-color: #ffffff; border-radius: 12px; padding: 15px; border: 1px solid #e2e8f0; }</string>
+           </property>
+           <layout class="QVBoxLayout" name="tcLayoutPart">
+            <item>
+             <layout class="QHBoxLayout" name="tableHeaderPart">
+              <item>
+               <widget class="QLabel" name="tableTitlePart">
+                <property name="styleSheet">
+                 <string notr="true">font-size: 16px; font-weight: bold; color: #0f172a;</string>
+                </property>
+                <property name="text">
+                 <string>Participants</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+         <spacer name="tableHeaderSpacerPart">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+              <item>
+               <widget class="QLineEdit" name="searchBoxPart">
+                <property name="minimumSize">
+                 <size>
+                  <width>150</width>
+                  <height>0</height>
+                 </size>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>260</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f8fafc; font-size: 12px; color: #0f172a;</string>
+                </property>
+                <property name="placeholderText">
+                 <string>Rechercher...</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QComboBox" name="comboTriPart">
+                <property name="minimumSize">
+                 <size>
+                  <width>160</width>
+                  <height>0</height>
+                 </size>
+                </property>
+                <property name="cursor">
+                 <cursorShape>PointingHandCursor</cursorShape>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">QComboBox { background-color: #ffffff; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 6px; color: #0f172a; font-weight: 600; font-size: 12px; }
+QComboBox:hover { background-color: #f1f5f9; border-color: #94a3b8; }
+QComboBox QAbstractItemView { background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; selection-background-color: #2563eb; selection-color: #ffffff; outline: 0; }</string>
+                </property>
+                <item>
+                 <property name="text">
+                  <string>Tri : ID</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Tri : Nom (A-Z)</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Tri : Nom (Z-A)</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Tri : Prénom (A-Z)</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Tri : Prénom (Z-A)</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Tri : E-mail (A-Z)</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Tri : E-mail (Z-A)</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="addBtnPart">
+                <property name="styleSheet">
+                 <string notr="true">QPushButton { background-color: #2563eb; color: white; padding: 8px 16px; border-radius: 8px; font-weight: bold; border: none; }
+QPushButton:hover { background-color: #1d4ed8; }</string>
+                </property>
+                <property name="text">
+                 <string>+ Ajouter</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+
+            <item>
+             <widget class="QTableWidget" name="tablePart">
+              <property name="styleSheet">
+               <string notr="true">QTableWidget { border: none; background: #ffffff; gridline-color: transparent; }
+QTableWidget::item { padding: 4px 6px; color: #334155; border-bottom: 1px solid #f1f5f9; }
+QHeaderView::section { background-color: #f8fafc; border: none; padding: 8px; font-weight: bold; color: #64748b; font-size: 12px; }</string>
+              </property>
+              <attribute name="horizontalHeaderDefaultSectionSize">
+               <number>62</number>
+              </attribute>
+              <property name="columnCount">
+               <number>8</number>
+              </property>
+              <column>
+               <property name="text">
+                <string>Nom</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>Prénom</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>E-mail</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>Téléphone</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>Équipe</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>Statut</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>Engagement</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>Actions</string>
+               </property>
+              </column>
+             </widget>
+            </item>
+
+            <item>
+             <layout class="QHBoxLayout" name="paginationLayoutPart"/>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QFrame" name="actionsCardPart">
+           <property name="minimumSize">
+            <size>
+             <width>230</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="styleSheet">
+            <string notr="true">QFrame#actionsCardPart { background-color: #ffffff; border-radius: 12px; padding: 15px; border: 1px solid #e2e8f0; }</string>
+           </property>
+           <layout class="QVBoxLayout" name="acLayoutPart">
+            <item>
+             <widget class="QLabel" name="actionsTitlePart">
+              <property name="styleSheet">
+               <string notr="true">font-size: 16px; font-weight: bold; color: #0f172a; margin-bottom: 10px;</string>
+              </property>
+              <property name="text">
+               <string>Actions rapides</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnAction1Part">
+              <property name="styleSheet">
+               <string notr="true">QPushButton { background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; border-radius: 8px; text-align: left; color: #334155; font-size: 12px; font-weight: 500; }
+QPushButton:hover { background-color: #f1f5f9; border-color: #cbd5e1; }</string>
+              </property>
+              <property name="text">
+               <string>👥  Affecter à une équipe</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnAction3Part">
+              <property name="styleSheet">
+               <string notr="true">QPushButton { background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; border-radius: 8px; text-align: left; color: #334155; font-size: 12px; font-weight: 500; }
+QPushButton:hover { background-color: #f1f5f9; border-color: #cbd5e1; }</string>
+              </property>
+              <property name="text">
+               <string>📩  Rappeler les retardataires</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnAction4Part">
+              <property name="styleSheet">
+               <string notr="true">QPushButton { background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; border-radius: 8px; text-align: left; color: #334155; font-size: 12px; font-weight: 500; }
+QPushButton:hover { background-color: #f1f5f9; border-color: #cbd5e1; }</string>
+              </property>
+              <property name="text">
+               <string>🎯  Valider statut projet</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnAction5Part">
+              <property name="styleSheet">
+               <string notr="true">QPushButton { background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; border-radius: 8px; text-align: left; color: #334155; font-size: 12px; font-weight: 500; }
+QPushButton:hover { background-color: #f1f5f9; border-color: #cbd5e1; }</string>
+              </property>
+              <property name="text">
+               <string>📊  Rapport de progression</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnAction6Part">
+              <property name="styleSheet">
+               <string notr="true">QPushButton { background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; border-radius: 8px; text-align: left; color: #334155; font-size: 12px; font-weight: 500; }
+QPushButton:hover { background-color: #f1f5f9; border-color: #cbd5e1; }</string>
+              </property>
+              <property name="text">
+               <string>📜  Certificat de participation</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+         <spacer name="actionsSpacerPart">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
         </item>
        </layout>
       </widget>

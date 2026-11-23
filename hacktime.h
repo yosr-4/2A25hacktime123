@@ -132,6 +132,7 @@ private:
     void initEmploye();
 
     Ui::HackTime *ui;
+    QObject *moduleParticipants = nullptr;   // module Participants (participantui.h)
 
     // =================================================================
     // === MODULE COMPETITION (méthodes et données) ====================

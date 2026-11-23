@@ -4,6 +4,7 @@
 #include "employe.h"
 #include "statsemploye.h"
 #include "arduino.h"
+#include "participantui.h"
 
 #include <QAction>
 #include <QDate>
@@ -64,7 +65,6 @@
 #include <functional>
 #include <QLinearGradient>
 #include <QPointer>
-#include <QSerialPort>
 #include <QScrollArea>
 #include <QTime>
 
@@ -83,6 +83,11 @@ HackTime::HackTime(QWidget *parent)
     if (QScreen *ecran = QGuiApplication::primaryScreen())
         taille = taille.boundedTo(ecran->availableGeometry().size() - QSize(20, 50));
     resize(taille);
+
+    // les pages (Compétitions, Ateliers...) ne doivent pas imposer leur largeur minimale à la fenêtre :
+    // sinon la fenêtre dépasse l'écran et la droite des pages est coupée (écran 1536 px, zoom 125 %)
+    for (int i = 0; i < ui->stackedHackTime->count(); ++i)
+        ui->stackedHackTime->widget(i)->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
 
     // ----- navigation : boutons des barres latérales de tous les modules
     // Compétitions
@@ -1057,7 +1062,11 @@ void HackTime::mettreAJourStatistiquesComp()
     }
     ui->kpiTotalComp->setText(QString::number(total));
     ui->kpiEquipes->setText(QString::number(equipes));
-    ui->kpiPart->setText(QString::number(equipes * 4));   // estimation : 4 membres par équipe
+    // participants : nombre réel (gestion Participants) ; sinon estimation de 4 membres par équipe
+    int nbParticipants = equipes * 4;
+    QSqlQuery qPart("SELECT COUNT(*) FROM participant");
+    if (qPart.next() && qPart.value(0).toInt() > 0) nbParticipants = qPart.value(0).toInt();
+    ui->kpiPart->setText(QString::number(nbParticipants));
     ui->kpiCours->setText(QString::number(parStatut.value("En cours")));
 
     // courbes : une valeur par mois de début
@@ -2038,10 +2047,12 @@ void HackTime::initEquipe()
 // === MODULE PARTICIPANT ==============================================
 // =====================================================================
 
-// 💡 Étudiant responsable du module Participant écrit ici
+// Module Participants : l'interface et la logique sont dans participantui.cpp (classe ModuleParticipants)
+// et la classe métier dans participant.cpp (classe Participant, espace de noms Metier).
 
 void HackTime::initParticipant()
 {
+    moduleParticipants = new ModuleParticipants(ui, this);
 }
 
 // =====================================================================

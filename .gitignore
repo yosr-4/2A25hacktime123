@@ -1,0 +1,13 @@
+# Qt Creator / fichiers générés
+*.pro.user*
+*.user
+build*/
+Makefile*
+*.o
+*.obj
+moc_*
+ui_*.h
+qrc_*.cpp
+debug/
+release/
+*.exe
