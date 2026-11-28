@@ -537,8 +537,13 @@ void HackTime::preparerFenetreComp()
     // tableau
     QTableWidget *t = ui->tableComp;
     t->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
+    // Nom et Thème se partagent toute la place restante : tout reste visible, sans barre de défilement
     t->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-    const int largeurs[] = {70, 0, 170, 100, 100, 110, 100, 100, 120};
+    t->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
+    t->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    t->setTextElideMode(Qt::ElideNone);   // jamais de « ... » : un texte trop long passe à la ligne
+    t->setWordWrap(true);
+    const int largeurs[] = {70, 0, 0, 90, 90, 115, 100, 105, 120};
     for (int i = 0; i < t->columnCount() && i < 9; ++i)
         if (largeurs[i]) t->setColumnWidth(i, largeurs[i]);
     t->setColumnHidden(0, true);   // l'ID reste dans le tableau (pour les actions) mais n'est pas affiché
@@ -745,7 +750,12 @@ void HackTime::remplirTableauComp()
             QTableWidgetItem *idItem = cellule(QString::number(c.getId()));
             idItem->setForeground(QColor("#1665E8"));
             t->setItem(r, 0, idItem);
-            t->setItem(r, 1, cellule(c.getNom()));
+            QTableWidgetItem *nomItem = cellule(c.getNom());
+            nomItem->setToolTip(c.getNom());
+            QFont gras = nomItem->font();
+            gras.setBold(true);
+            nomItem->setFont(gras);
+            t->setItem(r, 1, nomItem);
             t->setItem(r, 2, cellule(themeIcon(c.getTheme()) + "  " + c.getTheme()));
             t->setItem(r, 3, cellule(c.getDateDebut().toString("dd/MM/yyyy")));
             t->setItem(r, 4, cellule(c.getDateFin().toString("dd/MM/yyyy")));
@@ -755,6 +765,12 @@ void HackTime::remplirTableauComp()
             t->setCellWidget(r, 8, creerActionsComp(c.getId()));
             if (c.getId() == idSelectionneComp) t->selectRow(r);
         }
+    }
+    // hauteur des lignes : s'adapte si un nom ou un thème passe sur 2 lignes
+    {
+        t->resizeRowsToContents();
+        for (int r = 0; r < nb; ++r)
+            t->setRowHeight(r, std::max(t->rowHeight(r), 50));   // garde la place des pastilles
     }
     const int total = int(filtreeComp.size());
     ui->footerComp->setText(QString("Affichage de %1 à %2 sur %3 compétitions")
