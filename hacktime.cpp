@@ -58,6 +58,8 @@
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <QPainterPath>
+#include <QPolygonF>
+#include <QLineF>
 #include <QPropertyAnimation>
 #include <QTableWidgetItem>
 #include <QVariantAnimation>
@@ -1699,6 +1701,213 @@ void HackTime::ouvrirCalendrierComp()
 }
 
 // ----- MÉTIER : affiche d'une compétition, dessinée sur une page A4 du PDF
+// ----- MÉTIER : style de l'affiche selon le thème de la compétition
+// chaque thème a ses couleurs, son slogan et son motif décoratif
+struct StyleAfficheComp {
+    QColor fond1, fond2, fond3;   // dégradé du fond
+    QColor accent;                // bloc des dates, pastilles
+    QColor bandeau;               // texte « HACKATHON · THÈME »
+    QColor libelle;               // petits titres des cartes
+    QString slogan;
+    int motif;
+};
+
+static StyleAfficheComp styleAfficheComp(const QString &theme)
+{
+    const QString t = theme.toLower();
+    if (t.startsWith("environ"))
+        return {QColor("#08301F"), QColor("#14674A"), QColor("#2E9E5B"), QColor("#C2610C"), QColor("#F6C177"),
+                QColor("#A8E6C1"), "Innover pour une planète plus verte", 1};
+    if (t.startsWith("sant"))
+        return {QColor("#08283A"), QColor("#0E5E6F"), QColor("#109CA1"), QColor("#D62839"), QColor("#FF9AA5"),
+                QColor("#A6E3E9"), "La technologie au service de la vie", 2};
+    if (t.startsWith("duc") || t.startsWith("édu") || t.startsWith("educ"))
+        return {QColor("#1A1744"), QColor("#3730A3"), QColor("#5B5FE9"), QColor("#C26A06"), QColor("#FCD34D"),
+                QColor("#C7D2FE"), "Apprendre, partager, transmettre", 3};
+    if (t.startsWith("ville"))
+        return {QColor("#0B1324"), QColor("#16325A"), QColor("#0B7A99"), QColor("#0E7490"), QColor("#67E8F9"),
+                QColor("#A5F3FC"), "Imaginer la ville connectée de demain", 4};
+    if (t.startsWith("agri"))
+        return {QColor("#2E2010"), QColor("#5E4519"), QColor("#9A7020"), QColor("#4D7C0F"), QColor("#F3D27A"),
+                QColor("#F3E3B5"), "Cultiver l'innovation, nourrir l'avenir", 5};
+    if (t.startsWith("intel"))
+        return {QColor("#150926"), QColor("#3B0F6B"), QColor("#6D35E0"), QColor("#C0266D"), QColor("#F9A8D4"),
+                QColor("#DDD6FE"), "Des idées intelligentes pour demain", 6};
+    if (t.startsWith("dév") || t.startsWith("dev"))
+        return {QColor("#0D1117"), QColor("#161B22"), QColor("#1B5E3A"), QColor("#238636"), QColor("#7EE787"),
+                QColor("#9BE9A8"), "Coder, tester, livrer", 7};
+    if (t.startsWith("fin"))
+        return {QColor("#0A1628"), QColor("#14365C"), QColor("#1E4E79"), QColor("#9A6B00"), QColor("#F5D576"),
+                QColor("#F5DE9B"), "Réinventer la finance de demain", 8};
+    return {QColor("#0B1B3A"), QColor("#12317A"), QColor("#1665E8"), QColor("#FF6B00"), QColor("#FF8A3D"),
+            QColor("#9DB8F5"), "Relevez le défi, innovez ensemble", 0};
+}
+
+// motif décoratif dessiné derrière le texte (formes légères, transparentes)
+static void dessinerMotifAfficheComp(QPainter &p, const StyleAfficheComp &s)
+{
+    p.save();
+    QColor clair(255, 255, 255, 30);
+    QColor acc = s.accent;
+    acc.setAlpha(70);
+    p.setBrush(Qt::NoBrush);
+
+    switch (s.motif) {
+    case 1: {   // Environnement : feuilles
+        auto feuille = [&](QPointF centre, double taille, double angle, const QColor &col) {
+            p.save();
+            p.translate(centre);
+            p.rotate(angle);
+            QPainterPath f;
+            f.moveTo(0, -taille);
+            f.quadTo(taille * 0.6, 0, 0, taille);
+            f.quadTo(-taille * 0.6, 0, 0, -taille);
+            p.setPen(Qt::NoPen);
+            p.setBrush(col);
+            p.drawPath(f);
+            p.setPen(QPen(QColor(255, 255, 255, 50), 2));
+            p.drawLine(QPointF(0, -taille * 0.9), QPointF(0, taille * 0.9));
+            p.restore();
+        };
+        feuille(QPointF(545, 95), 80, 35, QColor(255, 255, 255, 28));
+        feuille(QPointF(490, 60), 45, -20, acc);
+        feuille(QPointF(55, 760), 90, -40, QColor(255, 255, 255, 22));
+        feuille(QPointF(120, 800), 50, 25, acc);
+        break;
+    }
+    case 2: {   // Santé : croix + ligne de battements de cœur
+        auto croix = [&](QPointF c, double t, const QColor &col) {
+            p.setPen(Qt::NoPen);
+            p.setBrush(col);
+            p.drawRoundedRect(QRectF(c.x() - t / 6, c.y() - t / 2, t / 3, t), 4, 4);
+            p.drawRoundedRect(QRectF(c.x() - t / 2, c.y() - t / 6, t, t / 3), 4, 4);
+        };
+        croix(QPointF(530, 90), 110, clair);
+        croix(QPointF(470, 160), 40, acc);
+        croix(QPointF(60, 730), 70, clair);
+        QPainterPath ecg;
+        ecg.moveTo(0, 405);
+        ecg.lineTo(70, 405); ecg.lineTo(82, 385); ecg.lineTo(94, 430); ecg.lineTo(108, 360);
+        ecg.lineTo(122, 420); ecg.lineTo(134, 405); ecg.lineTo(595, 405);
+        p.setPen(QPen(QColor(255, 255, 255, 45), 3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.drawPath(ecg);
+        break;
+    }
+    case 3: {   // Éducation : chapeaux de diplômé + lignes de cahier
+        auto chapeau = [&](QPointF c, double t, const QColor &col) {
+            p.setPen(Qt::NoPen);
+            p.setBrush(col);
+            QPolygonF losange;
+            losange << QPointF(c.x(), c.y() - t * 0.35) << QPointF(c.x() + t, c.y())
+                    << QPointF(c.x(), c.y() + t * 0.35) << QPointF(c.x() - t, c.y());
+            p.drawPolygon(losange);
+            p.drawRect(QRectF(c.x() - t * 0.55, c.y() + t * 0.1, t * 1.1, t * 0.45));
+            p.setPen(QPen(col, 3));
+            p.drawLine(QPointF(c.x() + t * 0.8, c.y()), QPointF(c.x() + t * 0.8, c.y() + t * 0.6));
+        };
+        chapeau(QPointF(510, 90), 75, clair);
+        chapeau(QPointF(80, 770), 60, acc);
+        p.setPen(QPen(QColor(255, 255, 255, 14), 1));
+        for (int y = 580; y < 780; y += 22) p.drawLine(QPointF(0, y), QPointF(595, y));
+        break;
+    }
+    case 4: {   // Ville intelligente : silhouette de ville + ondes wifi
+        const int hauteurs[] = {90, 140, 70, 170, 110, 60, 150, 95, 130, 75, 160, 100};
+        double x = 0;
+        for (int i = 0; i < 12; ++i) {
+            const double l = 49.6;
+            const QRectF imm(x, 782 - hauteurs[i], l - 4, hauteurs[i]);
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(255, 255, 255, 20));
+            p.drawRect(imm);
+            p.setBrush(acc);
+            for (double wy = imm.top() + 10; wy < 770; wy += 18)
+                for (double wx = imm.left() + 8; wx < imm.right() - 8; wx += 14)
+                    p.drawRect(QRectF(wx, wy, 6, 8));
+            x += l;
+        }
+        p.setPen(QPen(QColor(255, 255, 255, 40), 5, Qt::SolidLine, Qt::RoundCap));
+        for (int r = 30; r <= 90; r += 30)
+            p.drawArc(QRectF(520 - r, 110 - r, 2 * r, 2 * r), 45 * 16, 90 * 16);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(255, 255, 255, 50));
+        p.drawEllipse(QPointF(520, 110), 8, 8);
+        break;
+    }
+    case 5: {   // Agriculture : soleil + sillons du champ
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(255, 214, 102, 45));
+        p.drawEllipse(QPointF(520, 95), 60, 60);
+        p.setPen(QPen(QColor(255, 214, 102, 45), 4, Qt::SolidLine, Qt::RoundCap));
+        for (int a = 0; a < 360; a += 30) {
+            const double r = a * 3.14159265358979 / 180.0;
+            p.drawLine(QPointF(520 + 75 * std::cos(r), 95 + 75 * std::sin(r)),
+                       QPointF(520 + 100 * std::cos(r), 95 + 100 * std::sin(r)));
+        }
+        p.setPen(QPen(acc, 3));
+        for (int k = 0; k < 6; ++k) {
+            QPainterPath sillon;
+            sillon.moveTo(0, 700 + k * 16);
+            sillon.cubicTo(200, 680 + k * 16, 400, 730 + k * 16, 595, 700 + k * 16);
+            p.drawPath(sillon);
+        }
+        break;
+    }
+    case 6: {   // Intelligence artificielle : réseau de neurones
+        const QList<QPointF> noeuds = {{470, 60}, {540, 120}, {500, 190}, {420, 140}, {565, 230},
+                                       {40, 650}, {110, 700}, {60, 760}, {150, 770}, {30, 720}};
+        p.setPen(QPen(QColor(255, 255, 255, 35), 1.5));
+        for (int i = 0; i < noeuds.size(); ++i)
+            for (int j = i + 1; j < noeuds.size(); ++j)
+                if (QLineF(noeuds[i], noeuds[j]).length() < 130) p.drawLine(noeuds[i], noeuds[j]);
+        p.setPen(Qt::NoPen);
+        for (int i = 0; i < noeuds.size(); ++i) {
+            p.setBrush(i % 2 ? acc : QColor(255, 255, 255, 60));
+            p.drawEllipse(noeuds[i], 9, 9);
+        }
+        break;
+    }
+    case 7: {   // Développement : grille + symboles de code
+        p.setPen(QPen(QColor(255, 255, 255, 10), 1));
+        for (int g = 0; g <= 595; g += 30) p.drawLine(QPointF(g, 0), QPointF(g, 842));
+        for (int g = 0; g <= 842; g += 30) p.drawLine(QPointF(0, g), QPointF(595, g));
+        QFont f("Consolas");
+        f.setPixelSize(90);
+        f.setBold(true);
+        p.setFont(f);
+        p.setPen(QColor(255, 255, 255, 30));
+        p.drawText(QRectF(380, 40, 200, 110), Qt::AlignCenter, "</>");
+        p.setPen(acc);
+        p.drawText(QRectF(10, 690, 200, 100), Qt::AlignCenter, "{ }");
+        break;
+    }
+    case 8: {   // Finance : graphique en barres + flèche montante
+        p.setPen(Qt::NoPen);
+        const int barres[] = {50, 80, 65, 110, 150};
+        for (int i = 0; i < 5; ++i) {
+            p.setBrush(i == 4 ? acc : QColor(255, 255, 255, 25));
+            p.drawRect(QRectF(420 + i * 32, 200 - barres[i], 22, barres[i]));
+        }
+        p.setPen(QPen(QColor(255, 255, 255, 60), 4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.drawPolyline(QPolygonF() << QPointF(415, 175) << QPointF(470, 140) << QPointF(510, 155) << QPointF(570, 70));
+        p.drawPolyline(QPolygonF() << QPointF(548, 70) << QPointF(570, 70) << QPointF(570, 92));
+        p.setPen(QPen(QColor(255, 255, 255, 20), 6));
+        p.drawEllipse(QPointF(70, 760), 55, 55);
+        p.drawEllipse(QPointF(110, 790), 40, 40);
+        break;
+    }
+    default: {  // Autre : cercles
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(s.accent.red(), s.accent.green(), s.accent.blue(), 40));
+        p.drawEllipse(QPointF(560, 90), 170, 170);
+        p.setBrush(QColor(255, 255, 255, 18));
+        p.drawEllipse(QPointF(40, 780), 200, 200);
+        break;
+    }
+    }
+    p.restore();
+}
+
 void HackTime::dessinerAfficheComp(QPainter &p, const Competition &c)
 {
     p.save();
@@ -1716,17 +1925,14 @@ void HackTime::dessinerAfficheComp(QPainter &p, const Competition &c)
     const QStringList x = infosComp.value(c.getId(), VIDE);
     QLocale fr(QLocale::French);
 
-    // fond : dégradé bleu nuit -> bleu, avec deux cercles décoratifs
+    // fond : couleurs et motif selon le thème de la compétition
+    const StyleAfficheComp style = styleAfficheComp(c.getTheme());
     QLinearGradient fond(0, 0, 595, 842);
-    fond.setColorAt(0.0, QColor("#0B1B3A"));
-    fond.setColorAt(0.6, QColor("#12317A"));
-    fond.setColorAt(1.0, QColor("#1665E8"));
+    fond.setColorAt(0.0, style.fond1);
+    fond.setColorAt(0.6, style.fond2);
+    fond.setColorAt(1.0, style.fond3);
     p.fillRect(page, fond);
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(255, 107, 0, 40));
-    p.drawEllipse(QPointF(560, 90), 170, 170);
-    p.setBrush(QColor(255, 255, 255, 18));
-    p.drawEllipse(QPointF(40, 780), 200, 200);
+    dessinerMotifAfficheComp(p, style);
 
     // logo
     QImage logo(":/images/logo_hacktime_clair.png");
@@ -1736,23 +1942,28 @@ void HackTime::dessinerAfficheComp(QPainter &p, const Competition &c)
     }
 
     // bandeau thème
-    p.setPen(QColor("#FF8A3D"));
+    p.setPen(style.bandeau);
     p.setFont(police(14, QFont::Bold));
-    p.drawText(QRectF(40, 130, 515, 22), Qt::AlignCenter,
+    p.drawText(QRectF(40, 125, 515, 22), Qt::AlignCenter,
                QString("HACKATHON  ·  %1").arg(c.getTheme().toUpper()));
+    QFont italique = police(13);
+    italique.setItalic(true);
+    p.setFont(italique);
+    p.setPen(QColor(255, 255, 255, 200));
+    p.drawText(QRectF(40, 147, 515, 20), Qt::AlignCenter, style.slogan);
 
     // titre
     p.setPen(Qt::white);
     p.setFont(police(44, QFont::Black));
-    QRectF zoneTitre(40, 160, 515, 150);
+    QRectF zoneTitre(40, 172, 515, 140);
     QRectF utilise = p.boundingRect(zoneTitre, Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap, c.getNom());
-    if (utilise.height() > 150) p.setFont(police(32, QFont::Black));
+    if (utilise.height() > 140) p.setFont(police(32, QFont::Black));
     p.drawText(zoneTitre, Qt::AlignHCenter | Qt::AlignVCenter | Qt::TextWordWrap, c.getNom());
 
     // bloc dates (orange)
     const QRectF blocDates(95, 325, 405, 70);
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor("#FF6B00"));
+    p.setBrush(style.accent);
     p.drawRoundedRect(blocDates, 14, 14);
     p.setPen(Qt::white);
     p.setFont(police(13, QFont::DemiBold));
@@ -1776,7 +1987,7 @@ void HackTime::dessinerAfficheComp(QPainter &p, const Competition &c)
         p.setPen(QPen(QColor(255, 255, 255, 60), 1));
         p.setBrush(QColor(255, 255, 255, 26));
         p.drawRoundedRect(carte, 12, 12);
-        p.setPen(QColor("#9DB8F5"));
+        p.setPen(style.libelle);
         p.setFont(police(11, QFont::Bold));
         p.drawText(carte.adjusted(16, 10, -16, -44), Qt::AlignLeft | Qt::AlignVCenter, infos[k].first);
         p.setPen(Qt::white);
@@ -1794,7 +2005,7 @@ void HackTime::dessinerAfficheComp(QPainter &p, const Competition &c)
 
     // sponsors
     if (!x.value(3).isEmpty()) {
-        p.setPen(QColor("#9DB8F5"));
+        p.setPen(style.libelle);
         p.setFont(police(11, QFont::Bold));
         p.drawText(QRectF(40, 700, 515, 18), Qt::AlignCenter, "AVEC LE SOUTIEN DE");
         p.setPen(Qt::white);
@@ -1805,8 +2016,10 @@ void HackTime::dessinerAfficheComp(QPainter &p, const Competition &c)
 
     // pied de page
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0, 0, 0, 70));
+    p.setBrush(QColor(0, 0, 0, 90));
     p.drawRect(QRectF(0, 782, 595, 60));
+    p.setBrush(style.accent);
+    p.drawRect(QRectF(0, 782, 595, 4));   // liseré de la couleur du thème
     p.setPen(Qt::white);
     p.setFont(police(15, QFont::Bold));
     p.drawText(QRectF(40, 782, 330, 60), Qt::AlignLeft | Qt::AlignVCenter, "Inscriptions ouvertes · HackTime");
