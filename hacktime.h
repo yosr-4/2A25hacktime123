@@ -184,10 +184,9 @@ private:
     QVector<double> equipesParMoisComp, participantsParMoisComp;
     QPixmap fondLogin, fondLoginAjuste;
     QPropertyAnimation *clignotementLoginComp = nullptr;
-    // scénario Arduino (borne de suivi des compétitions)
+    // scénario Arduino (borne d'affichage des compétitions)
     void initArduinoComp();
-    void envoyerArduinoComp(bool alerte);
-    void alerteArduinoComp();
+    void envoyerArduinoComp();
     void lireArduinoComp();
     Arduino arduinoComp;
     QByteArray tamponArduinoComp;

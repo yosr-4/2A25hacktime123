@@ -1,61 +1,64 @@
 HACKTIME - SCÉNARIO ARDUINO DU MODULE « GESTION DES COMPÉTITIONS »
 =====================================================================
-« Borne de suivi des compétitions » (demi-scénario qui passe par la base Oracle)
+« Borne d'affichage des compétitions » (passe par la base Oracle)
+Composants : écran LCD 16x2 I2C + 2 boutons. Pas de buzzer, pas de LED.
 
-IDÉE
-  Une petite borne posée à l'accueil du hackathon affiche les compétitions
-  enregistrées dans la base Oracle. L'organisateur peut les faire défiler et
-  faire avancer leur statut directement depuis la borne (sans clavier ni souris).
+1. OBJECTIF
+  Une borne affiche les compétitions enregistrées dans Oracle et permet de
+  changer leur statut avec un bouton. Le changement est enregistré dans Oracle.
 
-FONCTIONNEMENT (Qt <-> Arduino <-> Oracle)
-  1. Au démarrage, l'application Qt se connecte à la carte (classe Arduino, port USB série, 9600 bauds).
-  2. Après la connexion (hacktime123 ou yosr123), Qt lit les compétitions dans Oracle
-     (SELECT ... FROM COMPETITION) et envoie la première à la borne :
-        écran LCD :  « AI for Good     »
-                     « Planifiee J-3   »
-     Si une compétition PLANIFIÉE commence aujourd'hui : alerte = message + 3 bips.
-  3. Bouton SUIVANTE  -> l'Arduino envoie "N" -> Qt envoie la compétition suivante.
-  4. Bouton STATUT    -> l'Arduino envoie "S" -> Qt fait dans Oracle :
-        UPDATE COMPETITION SET STATUT = ... WHERE ID_COMPETITION = ...
-        (Planifiée -> En cours -> Terminée -> Planifiée)
-     puis relit la base : le tableau, les statistiques et l'écran LCD sont mis à jour,
-     et la borne fait un bip de confirmation.
-  5. Toute modification faite dans l'application (ajout, modification, suppression)
-     est aussi renvoyée à l'écran de la borne.
+2. FONCTIONNEMENT
+  - Ligne 1 du LCD : nom de la compétition.  Ligne 2 : son statut.
+        HACKATHON IA
+        PLANIFIEE
+  - Bouton SUIVANTE : compétition suivante.
+  - Bouton STATUT   : PLANIFIEE -> EN COURS -> TERMINEE (puis de nouveau PLANIFIEE).
+    Le nouveau statut est enregistré dans Oracle, puis le LCD, le tableau et
+    les statistiques de l'application sont mis à jour.
 
-PROTOCOLE SÉRIE (une ligne = une commande, terminée par '\n')
-  Arduino -> Qt :  N  (suivante)     S  (changer le statut)
-  Qt -> Arduino :  C|ligne1|ligne2   afficher
-                   A|ligne1|ligne2   alerte (afficher + 3 bips)
-                   B                 bip de confirmation
+3. COMMUNICATION ARDUINO - QT - ORACLE
+  Arduino ne parle pas directement à Oracle :
+   1. Arduino <-> Qt : port série USB, 9600 bauds (classe Arduino).
+   2. Qt lit les compétitions dans Oracle (Competition::lister : SELECT).
+   3. Qt envoie à Arduino : C|NOM|STATUT
+   4. Bouton STATUT : Arduino envoie S à Qt.
+   5. Qt fait l'UPDATE dans Oracle (Competition::changerStatut).
+   6. Qt relit Oracle et renvoie C|NOM|NOUVEAU STATUT.
+   7. Le LCD affiche le nouveau statut.
+  Bouton SUIVANTE : Arduino envoie N, Qt renvoie la compétition suivante.
 
-COMPOSANTS (récupérés / recyclables)
+4. COMPOSANTS
   - Arduino Uno (ou clone CH340)
-  - Écran LCD 16x2 avec module I2C (récupéré d'un ancien appareil / kit)
-  - 2 boutons poussoirs (récupérés d'une vieille télécommande, d'un clavier ou d'un jouet)
-  - 1 buzzer (récupéré d'une ancienne carte mère de PC ou d'un jouet)
-  - Fils récupérés d'anciens câbles (câble réseau / USB)
+  - Écran LCD 16x2 avec module I2C
+  - 2 boutons poussoirs (SUIVANTE, STATUT)
+  - Câble USB et fils Dupont
   - Boîtier : boîte en carton recyclée (trous pour l'écran et les boutons)
 
-CÂBLAGE
-  LCD I2C   : SDA -> A4   SCL -> A5   VCC -> 5V   GND -> GND
-  SUIVANTE  : broche D2 <-> GND
-  STATUT    : broche D3 <-> GND      (résistances de tirage internes : INPUT_PULLUP)
-  Buzzer    : + -> D8    - -> GND
+5. CÂBLAGE
+  LCD SDA -> A4     LCD SCL -> A5     LCD VCC -> 5V     LCD GND -> GND
+  Bouton SUIVANTE : D2 et GND
+  Bouton STATUT   : D3 et GND
+  Boutons en INPUT_PULLUP (pas de résistance externe).
 
-INSTALLATION
-  1. Arduino IDE : installer la bibliothèque « LiquidCrystal I2C » (Frank de Brabander),
-     ouvrir arduino/borne_competitions/borne_competitions.ino, choisir la carte et le port,
-     puis Téléverser. FERMER le moniteur série ensuite (sinon le port est occupé).
-  2. Qt : le module « Qt Serial Port » doit être installé
-     (Qt Maintenance Tool -> Qt 6.7.3 -> Additional Libraries -> Qt Serial Port).
-     Le .pro contient déjà : QT += serialport
-  3. Lancer HackTime avec la carte branchée. Le survol de la cloche 🔔 de la page
-     Compétitions indique si la borne est connectée.
+6. CONFIGURATION ET TEST
+  a) Oracle : la base hackathon doit contenir des compétitions (table COMPETITION).
+  b) Arduino IDE :
+     - Outils > Gérer les bibliothèques > « LiquidCrystal I2C » (Frank de Brabander) > Installer
+     - Ouvrir arduino/borne_competitions/borne_competitions.ino
+     - Outils > Type de carte : Arduino Uno ; Outils > Port : le port COM de la carte
+     - Téléverser. Le LCD affiche « HACKTIME / EN ATTENTE PC... »
+     - FERMER Arduino IDE (le port série doit être libre pour Qt)
+  c) Qt : installer « Qt Serial Port » (Qt Maintenance Tool > Qt 6.7.3 > Qt Serial Port).
+     Le .pro contient : QT += serialport
+  d) Lancer HackTime carte branchée, se connecter (hacktime123 ou yosr123) :
+     le LCD affiche la première compétition d'Oracle.
+  e) Test : SUIVANTE -> compétition suivante ; STATUT -> statut suivant,
+     vérifiable dans SQL Developer : SELECT NOM, STATUT FROM COMPETITION;
+  Survol de la cloche 🔔 de la page Compétitions : indique si la borne est connectée.
 
-OÙ EST LE CODE
-  arduino.h / arduino.cpp        classe Arduino (connexion, lecture, écriture)
-  competition.cpp                Competition::changerStatut()  -> UPDATE dans Oracle
-  hacktime.cpp (zone COMPETITION) initArduinoComp, envoyerArduinoComp,
-                                 alerteArduinoComp, lireArduinoComp
-  arduino/borne_competitions/borne_competitions.ino   programme de la carte
+7. OÙ EST LE CODE
+  arduino/borne_competitions/borne_competitions.ino  programme de la carte (LCD + boutons)
+  arduino.h / arduino.cpp          communication série (connexion, lecture, écriture)
+  competition.cpp                  Competition::changerStatut() : UPDATE dans Oracle
+  hacktime.cpp (zone COMPETITION)  initArduinoComp, envoyerArduinoComp, lireArduinoComp
+  HackTime.pro                     QT += serialport

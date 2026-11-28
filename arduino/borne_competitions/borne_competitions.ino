@@ -1,45 +1,33 @@
 /* =====================================================================
    HackTime - Scénario Arduino du module « Gestion des compétitions »
-   « Borne de suivi des compétitions »
+   « Borne d'affichage des compétitions »  (LCD 16x2 I2C + 2 boutons)
 
    - L'écran LCD affiche la compétition envoyée par l'application Qt
-     (lue dans la base Oracle) : nom + statut + jours restants.
-   - Bouton SUIVANTE : demande la compétition suivante      -> envoie "N"
-   - Bouton STATUT   : fait avancer le statut dans Oracle    -> envoie "S"
-       (Planifiée -> En cours -> Terminée), l'application fait l'UPDATE
-       puis renvoie l'affichage à jour.
-   - Buzzer : bip de confirmation, et 3 bips quand une compétition
-     commence aujourd'hui (alerte envoyée par l'application).
+     (lue dans la base Oracle) :  ligne 1 = nom, ligne 2 = statut.
+   - Bouton SUIVANTE : compétition suivante              -> envoie "N" à Qt
+   - Bouton STATUT   : statut suivant, enregistré dans Oracle -> envoie "S" à Qt
+       (PLANIFIEE -> EN COURS -> TERMINEE ; Qt fait l'UPDATE puis renvoie l'affichage)
 
-   Messages reçus de Qt (une ligne terminée par '\n') :
-     C|ligne1|ligne2   afficher une compétition
-     A|ligne1|ligne2   alerte : afficher + 3 bips
-     B                 bip court (confirmation)
+   Message reçu de Qt (une ligne terminée par '\n') :
+     C|ligne1|ligne2      afficher une compétition
 
    Câblage :
      LCD 16x2 I2C : SDA -> A4, SCL -> A5, VCC -> 5V, GND -> GND
-     Bouton SUIVANTE : D2 <-> GND   (résistance de tirage interne)
+     Bouton SUIVANTE : D2 <-> GND   (INPUT_PULLUP : pas de résistance externe)
      Bouton STATUT   : D3 <-> GND
-     Buzzer          : D8 (+) , GND (-)
-   Bibliothèque : « LiquidCrystal I2C » (Frank de Brabander), via le gestionnaire de bibliothèques.
+   Bibliothèque : « LiquidCrystal I2C » (Frank de Brabander).
    ===================================================================== */
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);   // si l'écran reste vide, essayer l'adresse 0x3F
+LiquidCrystal_I2C lcd(0x27, 16, 2);   // si l'écran reste vide : essayer l'adresse 0x3F
 
 const int BTN_SUIVANTE = 2;
 const int BTN_STATUT = 3;
-const int BUZZER = 8;
 
-String recu;                 // ligne en cours de réception
+String recu;                          // ligne en cours de réception
 int etatSuiv = HIGH, etatStatut = HIGH;
 unsigned long dernierAppui = 0;
-
-void bip(int duree) {
-  tone(BUZZER, 1800, duree);
-  delay(duree + 40);
-}
 
 void afficher(const String &l1, const String &l2) {
   lcd.clear();
@@ -49,29 +37,21 @@ void afficher(const String &l1, const String &l2) {
   lcd.print(l2.substring(0, 16));
 }
 
-// traite une ligne reçue de l'application Qt
+// traite un message de Qt : "C|ligne1|ligne2"
 void traiter(const String &ligne) {
-  if (ligne.length() == 0) return;
-  const char type = ligne.charAt(0);
-  if (type == 'B') { bip(80); return; }
-
-  // découpe "X|ligne1|ligne2"
+  if (ligne.length() == 0 || ligne.charAt(0) != 'C') return;
   const int p1 = ligne.indexOf('|');
   const int p2 = ligne.indexOf('|', p1 + 1);
   if (p1 < 0) return;
   const String l1 = (p2 > 0) ? ligne.substring(p1 + 1, p2) : ligne.substring(p1 + 1);
   const String l2 = (p2 > 0) ? ligne.substring(p2 + 1) : "";
-
   afficher(l1, l2);
-  if (type == 'A') {
-    for (int i = 0; i < 3; ++i) { bip(150); delay(120); }
-  }
 }
 
-// envoie une commande quand un bouton passe de relâché à appuyé
+// bouton appuyé (passage de relâché à appuyé) -> envoie la commande à Qt
 void lireBouton(int broche, int &ancien, const char *commande) {
   const int etat = digitalRead(broche);
-  if (etat == LOW && ancien == HIGH && millis() - dernierAppui > 250) {
+  if (etat == LOW && ancien == HIGH && millis() - dernierAppui > 250) {   // anti-rebond
     Serial.println(commande);
     dernierAppui = millis();
   }
@@ -82,10 +62,9 @@ void setup() {
   Serial.begin(9600);
   pinMode(BTN_SUIVANTE, INPUT_PULLUP);
   pinMode(BTN_STATUT, INPUT_PULLUP);
-  pinMode(BUZZER, OUTPUT);
   lcd.init();
   lcd.backlight();
-  afficher("HackTime", "En attente PC...");
+  afficher("HACKTIME", "EN ATTENTE PC...");
 }
 
 void loop() {

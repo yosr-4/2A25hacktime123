@@ -447,7 +447,7 @@ void HackTime::seConnecterComp()
 
     allerCompetitions();
     afficherComp();
-    alerteArduinoComp();   // borne : alerte si une compétition commence aujourd'hui
+    envoyerArduinoComp();   // la borne affiche la première compétition
 }
 
 void HackTime::deconnexionComp()
@@ -1088,7 +1088,7 @@ void HackTime::mettreAJourStatistiquesComp()
     ui->statsChartComp->setText(QString());
     ui->statsChartComp->update();
     remplirOngletStatsComp();   // l'onglet « Statistiques » suit les données
-    envoyerArduinoComp(false);  // la borne Arduino suit aussi
+    envoyerArduinoComp();       // la borne Arduino suit aussi
 
     const int faites = parStatut.value("En cours") + parStatut.value("Terminée");
     ui->lblTaux->setText(QString("<b>Taux de participation : %1 %</b>  (compétitions en cours ou terminées)")
@@ -1939,10 +1939,11 @@ void HackTime::remplirOngletStatsComp()
     zone->setWidget(contenu);   // l'ancien contenu est supprimé par la QScrollArea
 }
 
-// ----- SCÉNARIO ARDUINO : borne de suivi des compétitions
+// ----- SCÉNARIO ARDUINO : borne d'affichage des compétitions (LCD 16x2 + 2 boutons)
 //  Arduino -> Qt : "N" (bouton SUIVANTE), "S" (bouton STATUT)
-//  Qt -> Arduino : "C|ligne1|ligne2" (affichage), "A|..|.." (alerte + 3 bips), "B" (bip)
-//  Le bouton STATUT fait un UPDATE dans Oracle (Planifiée -> En cours -> Terminée).
+//  Qt -> Arduino : "C|ligne1|ligne2"  (ligne 1 = nom, ligne 2 = statut)
+//  Le bouton STATUT fait un UPDATE dans Oracle (Planifiée -> En cours -> Terminée),
+//  puis Qt relit la base : tableau, statistiques et écran LCD sont mis à jour.
 void HackTime::initArduinoComp()
 {
     const int r = arduinoComp.connect_arduino();
@@ -1954,47 +1955,29 @@ void HackTime::initArduinoComp()
     connect(arduinoComp.getserial(), &QSerialPort::readyRead, this, &HackTime::lireArduinoComp);
 }
 
-// texte pour l'écran LCD : sans accents et coupé à 16 caractères
+// texte pour l'écran LCD : majuscules, sans accents, 16 caractères au plus
 static QString texteLcd(const QString &t)
 {
-    QString s = t.normalized(QString::NormalizationForm_D);
+    QString s = t.toUpper().normalized(QString::NormalizationForm_D);
     s.remove(QRegularExpression("[^\\x20-\\x7E]"));
     return s.left(16);
 }
 
-// envoie à la borne la compétition numéro indexArduinoComp (liste triée comme le tableau)
-void HackTime::envoyerArduinoComp(bool alerte)
+// envoie à la borne la compétition numéro indexArduinoComp (lue dans Oracle)
+void HackTime::envoyerArduinoComp()
 {
     if (!arduinoComp.estConnecte()) return;
-    QString l1 = "Aucune", l2 = "competition";
+    QString l1 = "AUCUNE", l2 = "COMPETITION";
     if (!listeComp.isEmpty()) {
         indexArduinoComp = (indexArduinoComp % listeComp.size() + listeComp.size()) % listeComp.size();
         const Competition &c = listeComp.at(indexArduinoComp);
-        const int jours = QDate::currentDate().daysTo(c.getDateDebut());
-        const QString quand = c.getStatut() == "Planifiée"
-                                  ? (jours > 0 ? QString("J-%1").arg(jours) : QString("auj."))
-                                  : (c.getStatut() == "En cours" ? QString("live") : QString("fini"));
         l1 = c.getNom();
-        l2 = QString("%1 %2").arg(c.getStatut(), quand);
+        l2 = c.getStatut();          // PLANIFIEE, EN COURS ou TERMINEE
     }
-    arduinoComp.write_to_arduino(QString("%1|%2|%3\n").arg(QString(alerte ? "A" : "C"), texteLcd(l1), texteLcd(l2)).toLatin1());
+    arduinoComp.write_to_arduino(QString("C|%1|%2\n").arg(texteLcd(l1), texteLcd(l2)).toLatin1());
 }
 
-// au démarrage de la session : alerte si une compétition planifiée commence aujourd'hui
-void HackTime::alerteArduinoComp()
-{
-    for (int i = 0; i < listeComp.size(); ++i) {
-        const Competition &c = listeComp.at(i);
-        if (c.getStatut() == "Planifiée" && c.getDateDebut() == QDate::currentDate()) {
-            indexArduinoComp = i;
-            envoyerArduinoComp(true);
-            return;
-        }
-    }
-    envoyerArduinoComp(false);
-}
-
-// lecture des commandes de la borne (une commande par ligne)
+// commandes reçues de la borne (une commande par ligne)
 void HackTime::lireArduinoComp()
 {
     tamponArduinoComp += arduinoComp.read_from_arduino();
@@ -2004,21 +1987,20 @@ void HackTime::lireArduinoComp()
         tamponArduinoComp.remove(0, fin + 1);
         if (roleComp.isEmpty() || listeComp.isEmpty()) continue;   // personne de connecté au module
 
-        if (cmd == "N") {                       // compétition suivante
+        if (cmd == "N") {                       // SUIVANTE : compétition suivante
             ++indexArduinoComp;
-            envoyerArduinoComp(false);
-        } else if (cmd == "S") {                // statut suivant, enregistré dans Oracle
+            envoyerArduinoComp();
+        } else if (cmd == "S") {                // STATUT : statut suivant, enregistré dans Oracle
             const Competition c = listeComp.at(indexArduinoComp % listeComp.size());
             const QString suivant = c.getStatut() == "Planifiée" ? "En cours"
-                                  : c.getStatut() == "En cours"  ? "Terminée" : "Planifiée";
-            if (Competition::changerStatut(c.getId(), suivant)) {
-                const int id = c.getId();
-                afficherComp();                 // relit Oracle (tableau, statistiques...)
-                for (int i = 0; i < listeComp.size(); ++i)
-                    if (listeComp.at(i).getId() == id) indexArduinoComp = i;
-                arduinoComp.write_to_arduino("B\n");
-                envoyerArduinoComp(false);
-            }
+                                  : c.getStatut() == "En cours"  ? "Terminée"
+                                                                 : "Planifiée";   // après Terminée : on recommence
+            if (!Competition::changerStatut(c.getId(), suivant)) continue;
+            const int id = c.getId();
+            afficherComp();                     // relit Oracle : tableau, statistiques, LCD
+            for (int i = 0; i < listeComp.size(); ++i)
+                if (listeComp.at(i).getId() == id) indexArduinoComp = i;
+            envoyerArduinoComp();
         }
     }
 }
